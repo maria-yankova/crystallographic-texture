@@ -183,7 +183,7 @@ def miller2miller_brav(m_inds, idx_type='direction'):
 
 
 def crystal2ortho(lattice_sys=None, a=None, b=None, c=None, α=None, β=None, γ=None,
-                   degrees=False, normed=True,align='cz'):
+                  degrees=False, normed=True, align='cz'):
     """
     Returns transformation matrix from a crystal to an orthonormal reference frame. 
     The opposite transformation given by the inverse matrix.
@@ -214,7 +214,7 @@ def crystal2ortho(lattice_sys=None, a=None, b=None, c=None, α=None, β=None, γ
     Returns
     -------
     M : ndarray of shape (3,3)
-        Transformation matrix from orthonormal to crystal reference frame.
+        Transformation matrix from a crystal to an orthonormal reference frame.
         Acts on coulmn vectors. The opposite transformation given by the inverse matrix.
 
     Notes
@@ -247,9 +247,9 @@ def crystal2ortho(lattice_sys=None, a=None, b=None, c=None, α=None, β=None, γ
         a, b, c = 1, 1, 1
     elif any([p is None for p in params[0:3]]):
         a, b, c = 1, 1, 1
-        raise Warning('Not all lattice parameters `a`, `b`, `c` given.' 
-                        'All three will be set to one.')    
-    
+        raise Warning('Not all lattice parameters `a`, `b`, `c` given.'
+                      'All three will be set to one.')
+
     if all([p is None for p in params[3:]]):
         degrees = True
         if lattice_sys == 'cubic':
@@ -265,7 +265,7 @@ def crystal2ortho(lattice_sys=None, a=None, b=None, c=None, α=None, β=None, γ
         elif lattice_sys == 'monoclinic':
             α, β, γ = 90, 99, 90
         elif lattice_sys == 'triclinic':
-            α, β, γ = 40, 50, 100    
+            α, β, γ = 40, 50, 100
 
     if degrees:
         α, β, γ = [np.radians(x) for x in [α, β, γ]]
@@ -281,8 +281,8 @@ def crystal2ortho(lattice_sys=None, a=None, b=None, c=None, α=None, β=None, γ
     # Find transformation matrix
     if align not in all_align:
         raise ValueError('"{}" is not a valid align option. '
-                             '`align` must be one of: {}.'.format(
-                                 align, all_align))
+                         '`align` must be one of: {}.'.format(
+                             align, all_align))
 
     elif align == 'cz':
         M = np.array([[1 / ar, - 1 / (np.tan(γr) * ar), a * np.cos(β)],
