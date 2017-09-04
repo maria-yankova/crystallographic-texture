@@ -128,7 +128,7 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
     [1] Giacovazzo et al.(2002) Fundamentals of Crystallography. Oxf Univ Press. p. 75-76.
     """
     proj_opt = { 'stereographic' : stereographic_proj,
-                   'equal_area_proj' : equal_area_proj }
+                   'equal_area' : equal_area_proj }
     if proj_type in proj_opt:
         project = proj_opt[proj_type]
     else:

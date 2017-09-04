@@ -29,14 +29,14 @@ def ax_ang2rot_mat(axes, angles, degrees=False):
 
     Find the rotation matrix for a single axis and angle:
 
-    >>> rotation_matrix(np.array([[0,0,1]]), np.array([np.pi/4]))
+    >>> ax_ang2rot_mat(np.array([[0,0,1]]), np.array([np.pi/4]))
     array([[[ 0.70710678, -0.70710678,  0.        ],
             [ 0.70710678,  0.70710678,  0.        ],
             [ 0.        ,  0.        ,  1.        ]]])
 
     Find the rotation matrices for different angles about the same axis:
 
-    >>> rotation_matrix(np.array([[0,0,1]]), np.array([np.pi/4, -np.pi/4]))
+    >>> ax_ang2rot_mat(np.array([[0,0,1]]), np.array([np.pi/4, -np.pi/4]))
     array([[[ 0.70710678, -0.70710678,  0.        ],
             [ 0.70710678,  0.70710678,  0.        ],
             [ 0.        ,  0.        ,  1.        ]],
@@ -47,7 +47,7 @@ def ax_ang2rot_mat(axes, angles, degrees=False):
 
     Find the rotation matrices about different axes by the same angle:
 
-    >>> rotation_matrix(np.array([[0,0,1], [0,1,0]]), np.array([np.pi/4]))
+    >>> ax_ang2rot_mat(np.array([[0,0,1], [0,1,0]]), np.array([np.pi/4]))
     array([[[ 0.70710678, -0.70710678,  0.        ],
             [ 0.70710678,  0.70710678,  0.        ],
             [ 0.        ,  0.        ,  1.        ]],
@@ -58,7 +58,7 @@ def ax_ang2rot_mat(axes, angles, degrees=False):
 
     Find the rotation matrices about different axes and angles:
 
-    >>> rotation_matrix(
+    >>> ax_ang2rot_mat(
         np.array([[0,0,1], [0,1,0]]), np.array([np.pi/4, -np.pi/4]))
     array([[[ 0.70710678, -0.70710678,  0.        ],
             [ 0.70710678,  0.70710678,  0.        ],
@@ -191,7 +191,7 @@ def euler2rot_mat_n(angles, degrees=False):
     -----
     Angular ranges are φ1: [0, 2π], Φ: [0, π], φ2: [0, 2π].
     By definition the Euler angles in Bunge convention represent a rotation of
-    the reference frame, i.e. a passive transformation. rotation_matrix() is
+    the reference frame, i.e. a passive transformation. ax_ang2rot_mat() is
     constructed for an active rotations and therefore we apply the rotations 
     of opposite sign and in the opposite order (-φ2, -Φ, -φ1) [1].
 
@@ -213,9 +213,9 @@ def euler2rot_mat_n(angles, degrees=False):
     Φ = angles[:, 1]
     φ2 = angles[:, 2]
 
-    Rz_phi1 = rotation_matrix(np.array([[0, 0, 1]]), -angles[:, 0])
-    Rx_Phi = rotation_matrix(np.array([[1, 0, 0]]), -angles[:, 1])
-    Rz_phi2 = rotation_matrix(np.array([[0, 0, 1]]), -angles[:, 2])
+    Rz_phi1 = ax_ang2rot_mat(np.array([[0, 0, 1]]), -angles[:, 0])
+    Rx_Phi = ax_ang2rot_mat(np.array([[1, 0, 0]]), -angles[:, 1])
+    Rz_phi2 = ax_ang2rot_mat(np.array([[0, 0, 1]]), -angles[:, 2])
 
     return Rz_phi2 @ Rx_Phi @ Rz_phi1
 
