@@ -35,7 +35,7 @@ def equal_area_proj(xyz):
     xyz = xyz / np.linalg.norm(xyz, axis=0)
 
     ρ, θ, φ = coordgeometry.cart2spherical(xyz)  # radius, azimuthal, polar
-    print(ρ, θ, φ)
+
     # Rotate poles in South hemisphere to North
     for i, phi in enumerate(φ):
         if φ[i] > np.pi / 2:
@@ -113,11 +113,12 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         aligned with the sample coordinate system. For a 'poly' crystal, 
         `proj_poles` expects the projections of a given pole in a set of crystals.
     rot_mat : ndarray of shape (n,3,3)
-        Array of `n` rotation matrices.
+        Array of `n` rotation matrices for conversion from crystal to sample
+        coordinate system. See notes.
 
     Returns
     -------
-    proj_poles : tuple of ndarrays of shape (n,)
+    proj_poles : list of tuples of ndarrays of shape (n,)
         Arrays of `n` polar angles and radii as projections of poles.
 
     Notes
@@ -130,11 +131,16 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         'orthorhombic':  α, β, γ = 90, 90, 90  (latt def)
         'monoclinic':    α, β, γ = 90, 99, 90  (α, γ: latt def, β: arbitrary )
         'triclinic':     α, β, γ = 40, 50, 100 (arbitrary)
+    If rotation matrices are obtained from euler angles in Bunge convention,
+    the inverse rotation matrices are needed to rotate from crystal to sample
+    reference frame.
 
     References
     ----------
     [1] Giacovazzo et al.(2002) Fundamentals of Crystallography. Oxf Univ Press. p. 75-76.
 
+    TODO:
+    - Add 'direction' pole option for polycrystal.
     """
 
     all_crys = ['single', 'poly']
@@ -143,7 +149,7 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
                          '`crys` must be one of: {}.'.format(
                              crys, all_crys))
 
-    if crys == 'poly' and not rot_mat:
+    if crys == 'poly' and not rot_mat.any():
         raise ValueError('Please specify `rot_mat` corresponding to'
                          'orientation of individual poles in polycrystal.')
     elif crys == 'single' and rot_mat:
@@ -179,13 +185,14 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
     cell_ortho = np.dot(M.T, cell_e)
 
     pole_types = ['direction', 'plane-normal']
+    proj_poles = []
+
     if pole_type not in pole_types:
         raise ValueError('"{}" is not a valid `pole_type` option. '
                          '`pole_type` must be one of: {}.'.format(
                              pole_type, pole_types))
 
     elif pole_type == 'plane-normal':
-
         # Convert Miller-Bravais to Miller indices
         if lattice_sys == 'hexagonal' and poles.shape[0] == 4:
             poles = lattice.miller_brav2miller(poles, idx_type='plane')
@@ -196,18 +203,20 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         # Reciprocal lattice vectors for poles (column vectors)
         g_poles = np.dot(cell_rec, poles)
 
-        # if crys == 'poly':
-
-        proj_poles = project(g_poles)
+        if crys == 'poly':
+            for g_i in range(g_poles.shape[1]):
+                pp = np.dot(rot_mat, g_poles[:,g_i]).T
+                proj_poles.append(project(pp))
+        else:
+            proj_poles.append(project(g_poles))
 
     elif pole_type == 'direction':
-
         # Convert Miller-Bravais to Miller indices
         if lattice_sys == 'hexagonal' and poles.shape[0] == 4:
             poles = lattice.miller_brav2miller(poles, idx_type='direction')
 
         d_poles = np.dot(M.T, poles)
 
-        proj_poles = project(d_poles)
+        proj_poles.append(project(d_poles))
 
     return proj_poles
