@@ -35,7 +35,7 @@ def equal_area_proj(xyz):
     xyz = xyz / np.linalg.norm(xyz, axis=0)
 
     ρ, θ, φ = coordgeometry.cart2spherical(xyz)  # radius, azimuthal, polar
-
+    print(ρ, θ, φ)
     # Rotate poles in South hemisphere to North
     for i, phi in enumerate(φ):
         if φ[i] > np.pi / 2:
@@ -79,10 +79,11 @@ def stereographic_proj(xyz):
 
 
 def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=None,
-                         pole_type=None, degrees=False, align='cz'):
+                          pole_type=None, degrees=False, align='cz', crys=None,
+                          rot_mat=None):
     """
-    Project a set of ctystal poles.
-    
+    Project a set of crystal poles specified using Miller(-Bravais) indices.
+
     Parameters
     ----------
     poles : ndarray of shape (3 or 4, n)
@@ -106,12 +107,19 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         - 'by': b-axis || y-axis and a*-axis || x*-axis
         - 'cz': c-axis || z-axis and a*-axis || x*-axis [Default]
         where * corresponds to reciprocal lattice vectors.
-    
+    crys : string 
+        Specifies type of crystal: 'single' or 'poly'. For 'single' crystal, 
+        `proj_poles` expects the projections of pole(s) in a single crystal 
+        aligned with the sample coordinate system. For a 'poly' crystal, 
+        `proj_poles` expects the projections of a given pole in a set of crystals.
+    rot_mat : ndarray of shape (n,3,3)
+        Array of `n` rotation matrices.
+
     Returns
     -------
     proj_poles : tuple of ndarrays of shape (n,)
         Arrays of `n` polar angles and radii as projections of poles.
-        
+
     Notes
     -----
     If lattice parameters α, β, γ = None, None, None, default values are:
@@ -126,30 +134,46 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
     References
     ----------
     [1] Giacovazzo et al.(2002) Fundamentals of Crystallography. Oxf Univ Press. p. 75-76.
+
     """
-    proj_opt = { 'stereographic' : stereographic_proj,
-                   'equal_area' : equal_area_proj }
+
+    all_crys = ['single', 'poly']
+    if crys not in all_crys:
+        raise ValueError('"{}" is not a valid crystal type. '
+                         '`crys` must be one of: {}.'.format(
+                             crys, all_crys))
+
+    if crys == 'poly' and not rot_mat:
+        raise ValueError('Please specify `rot_mat` corresponding to'
+                         'orientation of individual poles in polycrystal.')
+    elif crys == 'single' and rot_mat:
+        raise ValueError('"{}" and "{}" is not a valid set of options for `crys`'
+                         ' and `rot_mat`. Specify either `crys`=\'single\' or '
+                         '`crys`=\'poly\' and `rot_mat`'.format(crys, rot_mat))
+
+    proj_opt = {'stereographic': stereographic_proj,
+                'equal_area': equal_area_proj}
     if proj_type in proj_opt:
         project = proj_opt[proj_type]
     else:
         raise ValueError('"{}" is not a valid projection type. '
-                             '`proj_type` must be one of: {}.'.format(
-                                 proj_type, proj_opt.keys()))
+                         '`proj_type` must be one of: {}.'.format(
+                             proj_type, proj_opt.keys()))
 
     if latt_params:
-        params_dict = { 'a' : latt_params[0],
-                    'b' : latt_params[1], 
-                    'c' : latt_params[2], 
-                    'α' : latt_params[3], 
-                    'β' : latt_params[4], 
-                    'γ' : latt_params[5] }
+        params_dict = {'a': latt_params[0],
+                       'b': latt_params[1],
+                       'c': latt_params[2],
+                       'α': latt_params[3],
+                       'β': latt_params[4],
+                       'γ': latt_params[5]}
         M = lattice.crystal2ortho(lattice_sys, **params_dict, normed=True,
-                                degrees=degrees, align=align)
+                                  degrees=degrees, align=align)
     else:
         M = lattice.crystal2ortho(lattice_sys, normed=True,
-                                degrees=degrees, align=align)
+                                  degrees=degrees, align=align)
 
-    cell_e = np.array([[1,0,0], [0,1,0], [0,0,1]]).T
+    cell_e = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]]).T
 
     # Crystal vectors in orthonormal basis as column vectors
     cell_ortho = np.dot(M.T, cell_e)
@@ -157,9 +181,9 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
     pole_types = ['direction', 'plane-normal']
     if pole_type not in pole_types:
         raise ValueError('"{}" is not a valid `pole_type` option. '
-                             '`pole_type` must be one of: {}.'.format(
-                                 pole_type, pole_types))
-    
+                         '`pole_type` must be one of: {}.'.format(
+                             pole_type, pole_types))
+
     elif pole_type == 'plane-normal':
 
         # Convert Miller-Bravais to Miller indices
@@ -172,8 +196,10 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         # Reciprocal lattice vectors for poles (column vectors)
         g_poles = np.dot(cell_rec, poles)
 
+        # if crys == 'poly':
+
         proj_poles = project(g_poles)
-    
+
     elif pole_type == 'direction':
 
         # Convert Miller-Bravais to Miller indices
