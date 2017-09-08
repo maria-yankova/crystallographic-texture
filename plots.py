@@ -1,12 +1,15 @@
 import numpy as np
 import lattice
 import projections
+import geometry as gm
 from matplotlib import pyplot as plt
 from matplotlib import cm
+from plotly import tools
+import plotly.graph_objs as go
 
 
 def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
-                grid=False):
+                  grid=False, clrs=None):
     """
     Return a figure object for a pole figure.
 
@@ -29,6 +32,8 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
         'xyz' (default); 'yzx'; 'zxy'; 'yxz'; 'zyx'; 'xzy'.
     grid : bool
         Turn grid lines on plot on or off (default).
+    clrs : list of string
+        A list of colours to plot `poles` in a single crystal.
 
     Returns
     -------
@@ -65,7 +70,12 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
     if crys == 'single':
         # proj_poles = proj_poles[0]
         f, ax = plt.subplots(1, 1, subplot_kw={'polar': True}, figsize=(5, 5))
-        ax.scatter(proj_poles[0][0], proj_poles[0][1])
+        
+        if clrs:
+            for i in range(len(clrs)):
+                ax.scatter(proj_poles[0][0][i], proj_poles[0][1][i], c=clrs[i])
+        else:
+            ax.scatter(proj_poles[0][0], proj_poles[0][1])    
 
         ax.set_title("Stereographic projection", va='bottom')
         ax.set_rmax(1)
@@ -78,8 +88,8 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
 
         ax.set_yticklabels([])
         if not grid:
-                ax.yaxis.grid(False)
-                ax.xaxis.grid(False)
+            ax.yaxis.grid(False)
+            ax.xaxis.grid(False)
 
     elif crys == 'poly':
         n_figs = len(proj_poles)
@@ -87,18 +97,127 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
         # get poles labels
         poles_lbl = []
         for i in range(n_figs):
-            poles_lbl.append(''.join([str(x) for x in poles[:,i]]))
+            poles_lbl.append(''.join([str(x) for x in poles[:, i]]))
 
         f = plt.figure(1, figsize=(10, 10))
         for n in range(n_figs):
-            ax = f.add_subplot(1, n_figs, n+1, projection='polar')
-            cax = ax.scatter(proj_poles[n][0], proj_poles[n][1], cmap=cm.hsv,s=0.005)
+            ax = f.add_subplot(1, n_figs, n + 1, projection='polar')
+            cax = ax.scatter(proj_poles[n][0],
+                             proj_poles[n][1], cmap=cm.hsv, s=0.005)
             ax.set_rmax(1)
-            ax.set_xticklabels([axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
+            ax.set_xticklabels(
+                [axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
             ax.set_yticklabels([])
             ax.set_title("{" + poles_lbl[n] + "}", va='bottom')
             if not grid:
                 ax.yaxis.grid(False)
                 ax.xaxis.grid(False)
+
+    return f
+
+
+def plot_crystal_poles(poles, lattice_sys, pole_type, clrs):
+    """
+    Plot a single crystal and specified poles.abs
+
+    TODO:
+    - 
+    """
+    
+    M = lattice.crystal2ortho(lattice_sys, normed=True, degrees=True)
+
+    cell_e = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]]).T
+
+    # Crystal vectors in orthonormal basis as column vectors
+    cell_ortho = np.dot(M.T, cell_e)
+    box = gm.get_box_xyz(cell_ortho).T
+
+    pole_types = ['direction', 'plane-normal']
+    proj_poles = []
+
+    if pole_type == 'plane-normal':
+        # Convert Miller-Bravais to Miller indices
+        if lattice_sys == 'hexagonal' and poles.shape[0] == 4:
+            poles = lattice.miller_brav2miller(poles, idx_type='plane')
+
+        # Reciprocal lattice vectors in orthonormal basis
+        cell_rec = lattice.reciprocal_lattice_vecs(cell_ortho)
+        M_rec = cell_rec        # Column vectors of reciprocal a,b,c
+        # Reciprocal lattice vectors for poles (column vectors)
+        g_poles = np.dot(cell_rec, poles)
+
+        raise ImplementationError('Plotting of planes and plane-normals is not '
+                                  'supported yet.')
+
+    elif pole_type == 'direction':
+        # Convert Miller-Bravais to Miller indices
+        if lattice_sys == 'hexagonal' and poles.shape[0] == 4:
+            poles = lattice.miller_brav2miller(poles, idx_type='direction')
+
+        d_poles = np.dot(M.T, poles)
+        pole_vecs = np.stack((np.zeros((d_poles.shape)), d_poles),axis=0)
+
+        legend_name = lattice_sys + ' cell'
+        fig_size = [400, 400]
+
+        poles_lbl = []
+        for i in range(poles.shape[1]):
+            poles_lbl.append(
+                '{' + ''.join([str(int(x)) for x in poles[:, i]]) + '}')
+
+        trace1 = go.Scatter3d(
+            x=box[:, 0].ravel(),
+            y=box[:, 1].ravel(),
+            z=box[:, 2].ravel(),
+            mode='lines',
+            marker=dict(color='darkgrey'),
+            legendgroup=legend_name, name=legend_name)
+
+        traces = []
+        data = [trace1]
+        for i in range(pole_vecs.shape[2]):
+            data.append(
+                go.Scatter3d(
+                    x=pole_vecs[:, 0, i],
+                    y=pole_vecs[:, 1, i],
+                    z=pole_vecs[:, 2, i],
+                    mode='lines',
+                    marker=dict(color=clrs[i]),
+                    legendgroup=poles_lbl[i], name=poles_lbl[i])
+            )
+
+        camera = dict(
+            up=dict(x=0, y=0, z=1),
+            center=dict(x=0, y=0, z=0),
+            eye=dict(x=-0.1, y=-2.5, z=-0.1)
+        )
+
+        layout = go.Layout(autosize=False,
+                           width=fig_size[0],
+                           height=fig_size[1],
+
+                           legend=dict(traceorder='grouped', x=10, bordercolor='#FFFFFF',
+                                       borderwidth=10, xanchor='right', yanchor='top'),
+                           margin=go.Margin(l=20, r=20, b=20, t=20, pad=20),
+                           scene=dict(
+                               camera=camera,
+                               xaxis=dict(showgrid=False, zeroline=False,
+                                          showline=False,
+                                          ticks='',
+                                          showticklabels=False),
+                               yaxis=dict(showgrid=False,
+                                          zeroline=False,
+                                          showline=False,
+                                          ticks='',
+                                          showticklabels=False),
+                               zaxis=dict(showgrid=False,
+                                          zeroline=False,
+                                          showline=False,
+                                          ticks='',
+                                          showticklabels=False)
+                           ),
+                           )
+
+        f = go.Figure(data=data, layout=layout)
 
     return f
