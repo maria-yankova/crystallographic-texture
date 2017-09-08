@@ -5,7 +5,8 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 
 
-def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None):
+def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
+                grid=False):
     """
     Return a figure object for a pole figure.
 
@@ -23,7 +24,11 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None):
     lattice_sys : string, optional
         Lattice system is one of cubic, hexagonal, rhombohedral, tetragonal, 
         orthorhombic, monoclinic, triclinic.
-
+    axes  : string
+        Set alignment of sample axes with projection sphere axes. Options:
+        'xyz' (default); 'yzx'; 'zxy'; 'yxz'; 'zyx'; 'xzy'.
+    grid : bool
+        Turn grid lines on plot on or off (default).
 
     Returns
     -------
@@ -39,6 +44,8 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None):
     - Think about whether to have more than one pole figure for a single crystal 
     as well.
     - Add check the lenght of proj_poles = number of poles given.
+    - Add label with plot details: phase, projection type, upper hemisphere, 
+    data plotted.
 
     """
 
@@ -47,6 +54,13 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None):
         raise ValueError('"{}" is not a valid crystal type. '
                          '`crys` must be one of: {}.'.format(
                              crys, all_crys))
+
+    # Check valid entry for axes alignment
+    all_axes = ['xyz', 'yzx', 'zxy', 'yxz', 'zyx', 'xzy']
+    if axes not in all_axes:
+        raise ValueError('"{}" is not a valid axes option. '
+                         '`axes` must be one of: {}.'.format(
+                             axes, all_axes))
 
     if crys == 'single':
         # proj_poles = proj_poles[0]
@@ -63,6 +77,9 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None):
             ax.annotate('[0001]', xy=(0, 0), xytext=(10.3, 0.15))
 
         ax.set_yticklabels([])
+        if not grid:
+                ax.yaxis.grid(False)
+                ax.xaxis.grid(False)
 
     elif crys == 'poly':
         n_figs = len(proj_poles)
@@ -77,8 +94,11 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None):
             ax = f.add_subplot(1, n_figs, n+1, projection='polar')
             cax = ax.scatter(proj_poles[n][0], proj_poles[n][1], cmap=cm.hsv,s=0.005)
             ax.set_rmax(1)
-            ax.set_xticklabels([])
+            ax.set_xticklabels([axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
             ax.set_yticklabels([])
             ax.set_title("{" + poles_lbl[n] + "}", va='bottom')
+            if not grid:
+                ax.yaxis.grid(False)
+                ax.xaxis.grid(False)
 
     return f

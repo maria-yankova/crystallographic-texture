@@ -6,7 +6,7 @@ import lattice
 
 def equal_area_proj(xyz):
     """
-    Returns the normalised equal-area projection of `xyz`, which is an array of column vectors. 
+    Returns the normalised equal-area projection of `xyz`, which is an array of column vectors.
 
     Parameters
     ----------
@@ -80,41 +80,44 @@ def stereographic_proj(xyz):
 
 def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=None,
                           pole_type=None, degrees=False, align='cz', crys=None,
-                          rot_mat=None):
+                          rot_mat=None, axes='xyz'):
     """
     Project a set of crystal poles specified using Miller(-Bravais) indices.
 
     Parameters
     ----------
     poles : ndarray of shape (3 or 4, n)
-        Array of poles given in Miller (Miller-Bravais for 'hexagonal' 
+        Array of poles given in Miller (Miller-Bravais for 'hexagonal'
         lattice system) indices as column vectors.
     proj_type: string
         Projection type is 'stereographic' or 'equal_area'.
     lattice_sys : string, optional
-        Lattice system is one of cubic, hexagonal, rhombohedral, tetragonal, 
+        Lattice system is one of cubic, hexagonal, rhombohedral, tetragonal,
         orthorhombic, monoclinic, triclinic.
     latt_params : list of lenght 6
         Lattice parameters. The fist three represent the magnitude of each of the lattice vectors.
-        If all three are None, a = b = c = 1. 
+        If all three are None, a = b = c = 1.
         If all three angles are None, example angles sets are used as described in Notes.
     degrees : bool, optional
-        Units of `α`, `β`, `γ`. Radians by default.a
+        Units of `α`, `β`, `γ`. Radians by default.
     align : string, optional
-        Alignment option between crystal and orthonormal reference frames. 
-        Three options implemented (as described in [1]): 
+        Alignment option between crystal and orthonormal reference frames.
+        Three options implemented (as described in [1]):
         - 'ax': a-axis || x-axis and c*-axis || z*-axis
         - 'by': b-axis || y-axis and a*-axis || x*-axis
         - 'cz': c-axis || z-axis and a*-axis || x*-axis [Default]
         where * corresponds to reciprocal lattice vectors.
-    crys : string 
-        Specifies type of crystal: 'single' or 'poly'. For 'single' crystal, 
-        `proj_poles` expects the projections of pole(s) in a single crystal 
-        aligned with the sample coordinate system. For a 'poly' crystal, 
+    crys : string
+        Specifies type of crystal: 'single' or 'poly'. For 'single' crystal,
+        `proj_poles` expects the projections of pole(s) in a single crystal
+        aligned with the sample coordinate system. For a 'poly' crystal,
         `proj_poles` expects the projections of a given pole in a set of crystals.
     rot_mat : ndarray of shape (n,3,3)
         Array of `n` rotation matrices for conversion from crystal to sample
         coordinate system. See notes.
+    axes  : string
+        Set alignment of sample axes with projection sphere axes. Options:
+        'xyz' (default); 'yzx'; 'zxy'; 'yxz'; 'zyx'; 'xzy'.
 
     Returns
     -------
@@ -142,7 +145,7 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
     TODO:
     - Add 'direction' pole option for polycrystal.
     """
-
+    # Check valid entries for crystal type and rot_mat
     all_crys = ['single', 'poly']
     if crys not in all_crys:
         raise ValueError('"{}" is not a valid crystal type. '
@@ -157,6 +160,7 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
                          ' and `rot_mat`. Specify either `crys`=\'single\' or '
                          '`crys`=\'poly\' and `rot_mat`'.format(crys, rot_mat))
 
+    # Check valid entry for projection type
     proj_opt = {'stereographic': stereographic_proj,
                 'equal_area': equal_area_proj}
     if proj_type in proj_opt:
@@ -165,6 +169,15 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         raise ValueError('"{}" is not a valid projection type. '
                          '`proj_type` must be one of: {}.'.format(
                              proj_type, proj_opt.keys()))
+
+    # Check valid entry for axes alignment
+    all_axes = ['xyz', 'yzx', 'zxy', 'yxz', 'zyx', 'xzy']
+    if axes not in all_axes:
+        raise ValueError('"{}" is not a valid axes option. '
+                         '`axes` must be one of: {}.'.format(
+                             axes, all_axes))
+    else:
+        R_ax = rotate_axes(axes)
 
     if latt_params:
         params_dict = {'a': latt_params[0],
@@ -205,8 +218,9 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
 
         if crys == 'poly':
             for g_i in range(g_poles.shape[1]):
-                pp = np.dot(rot_mat, g_poles[:,g_i]).T
-                proj_poles.append(project(pp))
+                pp = np.dot(rot_mat, g_poles[:, g_i]).T
+                ppp = np.dot(np.squeeze(R_ax, axis=0), pp)
+                proj_poles.append(project(ppp))
         else:
             proj_poles.append(project(g_poles))
 
@@ -220,3 +234,42 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         proj_poles.append(project(d_poles))
 
     return proj_poles
+
+
+def rotate_axes(axes):
+    """
+    Notes:
+    Convention for an active rotation used: looking down the axis of rotation,
+    counter-clockwise rotation is > 0, and clockwise < 0.
+
+    TODO:
+    - Add all options: ['xyz', 'yzx', 'zxy', 'yxz', 'zyx', 'xzy']
+    """
+    if axes == 'xyz':
+        Rtot = np.eye(3, 3)
+
+    elif axes == 'yzx':
+        R1 = rotations.ax_ang2rot_mat(np.array([0, 1, 0]), -90.0, degrees=True)
+        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), -90.0, degrees=True)
+        Rtot = R2 @ R1
+
+    elif axes == 'zxy':
+        R1 = rotations.ax_ang2rot_mat(np.array([1, 0, 0]), 90.0, degrees=True)
+        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), 90.0, degrees=True)
+        Rtot = R2 @ R1
+
+    elif axes == 'yxz':
+        R1 = rotations.ax_ang2rot_mat(
+            np.array([0, 1, 0]), -180.0, degrees=True)
+        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), 90.0, degrees=True)
+        Rtot = R2 @ R1
+
+    elif axes == 'zyx':
+        R1 = rotations.ax_ang2rot_mat(np.array([0, 1, 0]), 90.0, degrees=True)
+        Rtot = R1
+
+    elif axes == 'xzy':
+        R1 = rotations.ax_ang2rot_mat(np.array([1, 0, 0]), -90.0, degrees=True)
+        Rtot = R1
+
+    return Rtot
