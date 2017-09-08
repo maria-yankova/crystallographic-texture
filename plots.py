@@ -9,9 +9,11 @@ import plotly.graph_objs as go
 
 
 def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
-                  grid=False, clrs=None):
+                  grid=False, clrs=None, contour=False):
     """
-    Return a figure object for a pole figure.
+    Return a figure object for a pole figure. For a single crystal, plots a single 
+    pole figure for all `poles`. For a poly crystal, plots n pole figures, one 
+    for each pole in `poles`. 
 
     Parameters
     ----------
@@ -34,14 +36,12 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
         Turn grid lines on plot on or off (default).
     clrs : list of string
         A list of colours to plot `poles` in a single crystal.
+    contour : bool
+        Plot a contour plot. False by dafualt. Only available if `crys` = 'poly'.
 
     Returns
     -------
     f : matplotlib figure
-
-    Notes
-    -----
-    We can either plot multiple poles for a single crystal or 
 
     TODO:
     - Sort out plot labelling: based on lattice system for single crystal, and
@@ -67,15 +67,18 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
                          '`axes` must be one of: {}.'.format(
                              axes, all_axes))
 
+    # Plot for a single crystal 
     if crys == 'single':
-        # proj_poles = proj_poles[0]
         f, ax = plt.subplots(1, 1, subplot_kw={'polar': True}, figsize=(5, 5))
         
-        if clrs:
+        if clrs and len(clrs)==proj_poles[0][0].shape[0]:
             for i in range(len(clrs)):
                 ax.scatter(proj_poles[0][0][i], proj_poles[0][1][i], c=clrs[i])
+        elif not clrs:
+            ax.scatter(proj_poles[0][0], proj_poles[0][1])
         else:
-            ax.scatter(proj_poles[0][0], proj_poles[0][1])    
+            raise ValueError('Length of {} and columns of {} do not match. '
+                    'Please specify colours for each pole.'.format(clrs, poles))
 
         ax.set_title("Stereographic projection", va='bottom')
         ax.set_rmax(1)
@@ -91,6 +94,7 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
             ax.yaxis.grid(False)
             ax.xaxis.grid(False)
 
+    # Plot for a poly crystal 
     elif crys == 'poly':
         n_figs = len(proj_poles)
 
