@@ -1,15 +1,19 @@
 import numpy as np
 import lattice
 import projections
-import geometry as gm
+import coordgeometry
+
 from matplotlib import pyplot as plt
 from matplotlib import cm
+import matplotlib.patches as mpatches
+import matplotlib.path as mpath
+
 from plotly import tools
 import plotly.graph_objs as go
 
 
 def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
-                  grid=False, clrs=None, contour=False):
+                  grid=False, clrs=None, contour=False, bins=50):
     """
     Return a figure object for a pole figure. For a single crystal, plots a single 
     pole figure for all `poles`. For a poly crystal, plots n pole figures, one 
@@ -38,6 +42,8 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
         A list of colours to plot `poles` in a single crystal.
     contour : bool
         Plot a contour plot. False by dafualt. Only available if `crys` = 'poly'.
+    bins : int
+        If `contour` = True, number of bins.
 
     Returns
     -------
@@ -51,6 +57,7 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
     - Add check the lenght of proj_poles = number of poles given.
     - Add label with plot details: phase, projection type, upper hemisphere, 
     data plotted.
+    - Think about link between number of bins and angles.
 
     """
 
@@ -103,11 +110,42 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
         for i in range(n_figs):
             poles_lbl.append(''.join([str(x) for x in poles[:, i]]))
 
-        f = plt.figure(1, figsize=(10, 10))
+        if not contour:
+            f_width = 3*n_figs
+            f_height = 10
+            f = plt.figure(1, figsize=(f_width, f_height))
+
+        else:
+            # Compute histogram for projected poles data
+            xgrid, ygrid = np.mgrid[-1:1:bins*1j, -1:1:bins*1j]
+            Hs = projections.bin_proj_poles(proj_poles, bins=bins)[0]
+            
+            f_width = 3*n_figs
+            f_height = 15
+            f = plt.figure(1, figsize=(f_width, f_height))
+            # f, axs = plt.subplots(int(contour==True), n_figs, figsize=(f_width, f_height))
+            pts_circ = coordgeometry.pts_on_circle(1)
+
+            # Plot contour pole figures
+            for n in range(n_figs):
+                ax = f.add_subplot(2, n_figs, n + 4)
+                # print(Hs[n].)
+                cax = ax.contourf(xgrid, ygrid, Hs[n], interp='none')
+                plot_mask_shape(pts_circ)
+                ax.set_aspect(1)
+                ax.axis('Off')
+                ax.set_xticklabels(
+                    [axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
+                ax.set_yticklabels([])
+                ax.set_title("{" + poles_lbl[n] + "}", va='bottom')
+                # cbar = plt.colorbar(cax, ax=ax)
+        
+            
+        # Plot scatter pole figures
         for n in range(n_figs):
-            ax = f.add_subplot(1, n_figs, n + 1, projection='polar')
+            ax = f.add_subplot(int(contour==True), n_figs, n + 1, projection='polar')
             cax = ax.scatter(proj_poles[n][0],
-                             proj_poles[n][1], cmap=cm.hsv, s=0.005)
+                            proj_poles[n][1], cmap=cm.hsv, s=0.005)
             ax.set_rmax(1)
             ax.set_xticklabels(
                 [axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
@@ -134,7 +172,7 @@ def plot_crystal_poles(poles, lattice_sys, pole_type, clrs):
 
     # Crystal vectors in orthonormal basis as column vectors
     cell_ortho = np.dot(M.T, cell_e)
-    box = gm.get_box_xyz(cell_ortho).T
+    box = coordgeometry.get_box_xyz(cell_ortho).T
 
     pole_types = ['direction', 'plane-normal']
     proj_poles = []
@@ -225,3 +263,51 @@ def plot_crystal_poles(poles, lattice_sys, pole_type, clrs):
         f = go.Figure(data=data, layout=layout)
 
     return f
+
+
+def plot_mask_shape(sh_verts, out=True, ax=None):
+    """
+    Plot a mask out(in)side a shape defined by `sh_verts`. 
+
+    Parameters
+    ----------
+    sh_verts : list of tuples
+        The coordinates of the shape vertices specified in counter-clockwise 
+        direction.
+    out : bool
+        Specify whether to mask the outside (default) or the inside of the shape.
+    ax : matplotlib Axes instance
+        The axis where the mask will be plotted. Default is the current axis.
+
+    Returns
+    -------
+
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    # Current plot limits
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+
+    # Verticies of the plot boundaries in clockwise direction
+    plot_verts = [(xlim[0], ylim[0]), (xlim[0], ylim[1]), 
+                   (xlim[1], ylim[1]), (xlim[1], ylim[0]), 
+                   (xlim[0], ylim[0])]
+
+    # Specify vertex types 
+    plot_verts_types = [mpath.Path.MOVETO] + (len(plot_verts) - 1) * [mpath.Path.LINETO]
+    sh_verts_types = [mpath.Path.MOVETO] + (len(sh_verts) - 1) * [mpath.Path.LINETO]
+
+    # Create a path and a white patch
+    path = mpath.Path(plot_verts + sh_verts, plot_verts_types + sh_verts_types)
+    patch = mpatches.PathPatch(path, facecolor='white', edgecolor='none')
+    
+    addpatch = ax.add_patch(patch)
+
+    # Reset to original plot limits
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+
+    return addpatch
+    
