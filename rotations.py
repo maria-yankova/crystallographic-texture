@@ -123,6 +123,7 @@ def ax_ang2rot_mat(axes, angles, degrees=False):
 
     return rot_mats
 
+
 def rotmat2ax_ang(rot_mats, degrees=False):
     """
     Converts rotation matrices to a set of rotation axes and angles.
@@ -131,7 +132,7 @@ def rotmat2ax_ang(rot_mats, degrees=False):
     ----------
     rot_mat : ndarray
         Array of shape (N, 3, 3) or (3, 3). 
-        
+
     degrees : bool (optional)
         If True, `angles` interpreted as degrees.
 
@@ -141,7 +142,7 @@ def rotmat2ax_ang(rot_mats, degrees=False):
         Array of shape (N,3), where N unit vectors are the rotation axes.
     angles : ndarray
         Array of shape (N,), where N is the number of angles corresponding to `axes`.
-        
+
     Notes
     -----
     Computed using the eigenvalues and eigenvectors of a rotation matrix. 
@@ -151,22 +152,22 @@ def rotmat2ax_ang(rot_mats, degrees=False):
     # Check dimensions
     if rot_mats.ndim == 2:
         rot_mats = rot_mats[np.newaxis]
-    
-    angles = np.arccos(0.5 * (np.matrix.trace(rot_mats,axis1=1,axis2=2) - 1))
-    
+
+    angles = np.arccos(0.5 * (np.matrix.trace(rot_mats, axis1=1, axis2=2) - 1))
+
     # Find eigenvalues, eigenvectors for `rot_mats`
     eigval, eigvec = np.linalg.eig(rot_mats)
-    axes = np.real(eigvec[ np.where(abs(eigval - 1)  < 1e-7) ])
+    axes = np.real(eigvec[np.where(abs(eigval - 1) < 1e-7)])
     if not axes.any():
-        raise ValueError('No eigenvalue 1 corresponding to unit eigenvector for' 
-                        '`rot_mats`. Check `rot_mats` is/are correct.')  
+        raise ValueError('No eigenvalue 1 corresponding to unit eigenvector for'
+                         '`rot_mats`. Check `rot_mats` is/are correct.')
 
     axes = np.linalg.norm(axes, axis=1)
-    
+
     # Convert to radians if necessary
     if degrees:
         angles = np.degrees(angles)
-    
+
     return axes, angles
 
 
@@ -255,3 +256,42 @@ def rot_mat2euler(R):
     φ2 = np.arctan2(R[0, 2], R[1, 2])
 
     return np.array([φ1, Φ, φ2])
+
+
+def rotate_axes(axes):
+    """
+    Notes:
+    Convention for an active rotation used: looking down the axis of rotation,
+    counter-clockwise rotation is > 0, and clockwise < 0.
+
+    TODO:
+    - Add all options: ['xyz', 'yzx', 'zxy', 'yxz', 'zyx', 'xzy']
+    """
+    if axes == 'xyz':
+        Rtot = np.eye(3, 3)
+
+    elif axes == 'yzx':
+        R1 = rotations.ax_ang2rot_mat(np.array([0, 1, 0]), -90.0, degrees=True)
+        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), -90.0, degrees=True)
+        Rtot = R2 @ R1
+
+    elif axes == 'zxy':
+        R1 = rotations.ax_ang2rot_mat(np.array([1, 0, 0]), 90.0, degrees=True)
+        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), 90.0, degrees=True)
+        Rtot = R2 @ R1
+
+    elif axes == 'yxz':
+        R1 = rotations.ax_ang2rot_mat(
+            np.array([0, 1, 0]), -180.0, degrees=True)
+        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), 90.0, degrees=True)
+        Rtot = R2 @ R1
+
+    elif axes == 'zyx':
+        R1 = rotations.ax_ang2rot_mat(np.array([0, 1, 0]), 90.0, degrees=True)
+        Rtot = R1
+
+    elif axes == 'xzy':
+        R1 = rotations.ax_ang2rot_mat(np.array([1, 0, 0]), -90.0, degrees=True)
+        Rtot = R1
+
+    return Rtot
