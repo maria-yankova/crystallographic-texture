@@ -129,7 +129,6 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
             # Plot contour pole figures
             for n in range(n_figs):
                 ax = f.add_subplot(2, n_figs, n + 4)
-                # print(Hs[n].)
                 cax = ax.contourf(xgrid, ygrid, Hs[n], interp='none')
                 plot_mask_shape(pts_circ)
                 ax.set_aspect(1)
