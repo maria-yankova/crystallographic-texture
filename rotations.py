@@ -271,27 +271,61 @@ def rotate_axes(axes):
         Rtot = np.eye(3, 3)
 
     elif axes == 'yzx':
-        R1 = rotations.ax_ang2rot_mat(np.array([0, 1, 0]), -90.0, degrees=True)
-        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), -90.0, degrees=True)
+        R1 = ax_ang2rot_mat(np.array([0, 1, 0]), -90.0, degrees=True)
+        R2 = ax_ang2rot_mat(np.array([0, 0, 1]), -90.0, degrees=True)
         Rtot = R2 @ R1
 
     elif axes == 'zxy':
-        R1 = rotations.ax_ang2rot_mat(np.array([1, 0, 0]), 90.0, degrees=True)
-        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), 90.0, degrees=True)
+        R1 = ax_ang2rot_mat(np.array([1, 0, 0]), 90.0, degrees=True)
+        R2 = ax_ang2rot_mat(np.array([0, 0, 1]), 90.0, degrees=True)
         Rtot = R2 @ R1
 
     elif axes == 'yxz':
-        R1 = rotations.ax_ang2rot_mat(
+        R1 = ax_ang2rot_mat(
             np.array([0, 1, 0]), -180.0, degrees=True)
-        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), 90.0, degrees=True)
+        R2 = ax_ang2rot_mat(np.array([0, 0, 1]), 90.0, degrees=True)
         Rtot = R2 @ R1
 
     elif axes == 'zyx':
-        R1 = rotations.ax_ang2rot_mat(np.array([0, 1, 0]), 90.0, degrees=True)
+        R1 = ax_ang2rot_mat(np.array([0, 1, 0]), 90.0, degrees=True)
         Rtot = R1
 
     elif axes == 'xzy':
-        R1 = rotations.ax_ang2rot_mat(np.array([1, 0, 0]), -90.0, degrees=True)
+        R1 = ax_ang2rot_mat(np.array([1, 0, 0]), -90.0, degrees=True)
         Rtot = R1
 
     return Rtot
+
+
+def rotate_eulers(val, ang, data_set, degrees=True):
+    """
+    Add or substract a rotation of a given value to a given Euler angle 
+    in a data set.
+
+    Parameters
+    ----------
+    val : float
+        Value by which to change `ang`. Positive value will be added and negative
+        subtracted.
+    ang : string 
+        Euler angle to be changed. Allowed values based on Bunge convention:
+        'phi1', 'Phi', 'phi2', 'φ1', 'Φ', 'φ2'.
+    data_set : ndarray of shape (N, 3)
+         An array of Euler angles using Bunge (zx'z") convention (φ1, Φ, φ2).
+    degrees : bool, optional (default True)
+        Units of angles. Note `ang` and `data_set` must have the same units.
+    Returns
+    -------
+
+
+    """
+    if ang == 'phi1' or ang == 'φ1':
+        ang_idx = 0
+    elif ang == 'Phi' or ang == 'Φ':
+        ang_idx = 1
+    elif ang == 'phi2' or ang == 'φ2':
+        ang_idx = 2
+
+    data_set[:, ang_idx] = data_set[:, ang_idx] + val
+
+    return data_set
