@@ -80,7 +80,7 @@ def stereographic_proj(xyz):
 
 def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=None,
                           pole_type=None, degrees=False, align='cz', crys=None,
-                          rot_mat=None, axes='xyz'):
+                          rot_mat=None, eulers=None, axes='xyz', ret_poles=False):
     """
     Project a set of crystal poles specified using Miller(-Bravais) indices.
 
@@ -115,14 +115,18 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
     rot_mat : ndarray of shape (n,3,3)
         Array of `n` rotation matrices for conversion from crystal to sample
         coordinate system. See notes.
+    eulers : ndarray of shape (N, 3), optional
+        An array of Euler angles using Bunge (zx'z") convention (φ1, Φ, φ2).
     axes  : string
         Set alignment of sample axes with projection sphere axes. Options:
         'xyz' (default); 'yzx'; 'zxy'; 'yxz'; 'zyx'; 'xzy'.
+    ret_poles : bool, optional (default False)
+        Optionally, return the 3d pole vectors before they are projected.
 
     Returns
     -------
     proj_poles : list of tuples of ndarrays of shape (n,)
-        Arrays of `n` polar angles and radii as projections of poles.
+        Arrays of polar angles and radii as projections of `n` poles.
 
     Notes
     -----
@@ -152,14 +156,21 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
                          '`crys` must be one of: {}.'.format(
                              crys, all_crys))
 
-    if crys == 'poly' and not rot_mat.any():
-        raise ValueError('Please specify `rot_mat` corresponding to'
+    # Check valid entry for rot_mat and eulers
+    if crys == 'poly':
+        if rot_mat and eulers:
+            raise ValueError('Specify either `rot_mat` or `eulers` but not both.')
+        elif eulers is not None:
+            rot_mat = np.linalg.inv(
+                rotations.euler2rot_mat_n(eulers, degrees=True))
+        elif rot_mat is None and eulers is None:
+            raise ValueError('Please specify `rot_mat` or `eulers` corresponding to'
                          'orientation of individual poles in polycrystal.')
     elif crys == 'single' and rot_mat:
         raise ValueError('"{}" and "{}" is not a valid set of options for `crys`'
                          ' and `rot_mat`. Specify either `crys`=\'single\' or '
                          '`crys`=\'poly\' and `rot_mat`'.format(crys, rot_mat))
-
+    
     # Check valid entry for projection type
     proj_opt = {'stereographic': stereographic_proj,
                 'equal_area': equal_area_proj}
@@ -177,7 +188,7 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
                          '`axes` must be one of: {}.'.format(
                              axes, all_axes))
     else:
-        R_ax = rotate_axes(axes)
+        R_ax = rotations.rotate_axes(axes)
 
     if latt_params:
         params_dict = {'a': latt_params[0],
@@ -233,43 +244,48 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
 
         proj_poles.append(project(d_poles))
 
-    return proj_poles
+    if ret_poles:
+        return proj_poles, ppp
+    else:
+        return proj_poles
 
 
-def rotate_axes(axes):
+
+def bin_proj_poles(proj_poles, bins=50, normed=True):
     """
-    Notes:
-    Convention for an active rotation used: looking down the axis of rotation,
-    counter-clockwise rotation is > 0, and clockwise < 0.
+    Compute the histograms of projected poles data points.
 
-    TODO:
-    - Add all options: ['xyz', 'yzx', 'zxy', 'yxz', 'zyx', 'xzy']
+    Parameters
+    ----------
+    proj_poles : list of tuples of ndarrays of shape (n,)
+        Arrays of polar angles and radii as projections of `n` poles.
+    bins : int, optional
+        Number of bins. Default is 50.
+    normed : bool, optional
+        If False, returns the number of samples in each bin. If True, returns 
+        the bin density bin_count / sample_count / bin_area
+
+    Returns
+    -------
+    Hs : list of ndarrays, shape (bins, bins)
+        List of `n` histograms calculated for a grid in Cartesian coordinates.
+    xedges : ndarray
+        The bin edges along the first dimension.
+    yedges : ndarray
+        The bin edges along the second dimension.
+
     """
-    if axes == 'xyz':
-        Rtot = np.eye(3, 3)
+    Hs = []
 
-    elif axes == 'yzx':
-        R1 = rotations.ax_ang2rot_mat(np.array([0, 1, 0]), -90.0, degrees=True)
-        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), -90.0, degrees=True)
-        Rtot = R2 @ R1
+    for p_i, p in enumerate(proj_poles):
 
-    elif axes == 'zxy':
-        R1 = rotations.ax_ang2rot_mat(np.array([1, 0, 0]), 90.0, degrees=True)
-        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), 90.0, degrees=True)
-        Rtot = R2 @ R1
+        # Convert polar to Cartesian coordinates
+        x, y = coordgeometry.polar2cart_2D(p[1], p[0] + np.pi)
 
-    elif axes == 'yxz':
-        R1 = rotations.ax_ang2rot_mat(
-            np.array([0, 1, 0]), -180.0, degrees=True)
-        R2 = rotations.ax_ang2rot_mat(np.array([0, 0, 1]), 90.0, degrees=True)
-        Rtot = R2 @ R1
+        # Calculate bidimensional histogram
+        H, xedges, yedges = np.histogram2d(x, y, bins=bins, normed=normed)
 
-    elif axes == 'zyx':
-        R1 = rotations.ax_ang2rot_mat(np.array([0, 1, 0]), 90.0, degrees=True)
-        Rtot = R1
+        Hs.append(np.flipud(np.fliplr(H)))
 
-    elif axes == 'xzy':
-        R1 = rotations.ax_ang2rot_mat(np.array([1, 0, 0]), -90.0, degrees=True)
-        Rtot = R1
 
-    return Rtot
+    return Hs, xedges, yedges
