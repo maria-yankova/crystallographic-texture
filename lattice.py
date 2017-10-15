@@ -215,7 +215,7 @@ def crystal2ortho(lattice_sys=None, a=None, b=None, c=None, α=None, β=None, γ
     -------
     M : ndarray of shape (3,3)
         Transformation matrix from a crystal to an orthonormal reference frame.
-        Acts on coulmn vectors. The opposite transformation given by the inverse matrix.
+        Acts on column vectors. The opposite transformation given by the inverse matrix.
 
     Notes
     -----
