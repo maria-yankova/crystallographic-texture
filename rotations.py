@@ -152,11 +152,12 @@ def rotmat2ax_ang(rot_mats, degrees=False):
     # Check dimensions
     if rot_mats.ndim == 2:
         rot_mats = rot_mats[np.newaxis]
-
+ 
     angles = np.arccos(0.5 * (np.matrix.trace(rot_mats, axis1=1, axis2=2) - 1))
 
     # Find eigenvalues, eigenvectors for `rot_mats`
-    eigval, eigvec = np.linalg.eig(rot_mats)
+    eigval, eigvec = np.linalg.eig(rot_mats.squeeze())
+
     axes = np.real(eigvec[:, np.where(abs(eigval - 1) < 1e-7)]).squeeze().T
     if not axes.any():
         raise ValueError('No eigenvalue 1 corresponding to unit eigenvector for'

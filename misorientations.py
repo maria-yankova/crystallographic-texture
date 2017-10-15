@@ -1,6 +1,7 @@
 import coordgeometry
 import projections
 import numpy as np
+import rotations
 
 
 def fibre_misorientation(fibre, euler_data, lattice_system, latt_params,
@@ -70,7 +71,7 @@ def misorientation_pair(eulers1, eulers2, degrees=True, ax_ang=True):
     gr2_inv_rot = np.linalg.inv(gr2_rot)
 
     rot_12 = gr2_rot @ gr1_inv_rot
-    ax_ang_12 = rotations.rotmat2ax_ang(rot_12.squeeze(), degrees=True)
+    ax_ang_12 = rotations.rotmat2ax_ang(rot_12, degrees=True)
 
     if ax_ang:
         return ax_ang_12
