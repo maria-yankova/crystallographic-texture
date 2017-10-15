@@ -3,17 +3,47 @@ import projections
 import numpy as np
 
 
-def fibre_misorientation(fibre, pole_data, lattice_system, latt_params, axes, mask):
+def fibre_misorientation(fibre, euler_data, lattice_system, latt_params, 
+                        axes='xyz', mask=None, user_rot=None):
     """
     Find the misorientation away from a fibre texture.
 
+    Parameters
+    ----------
+    fibre : ndarray of shape (3, 1)
+        Fibre pole specified as a column vector.
+    euler_data : ndarray of shape (N, 3)
+        Euler angles data for N number of pixels.
+    lattice_system : string
+        Lattice system is one of cubic, hexagonal, rhombohedral, tetragonal,
+        orthorhombic, monoclinic, triclinic.
+    latt_params :  list of lenght 6
+        Lattice parameters. The fist three represent the magnitude of each of 
+        the lattice vectors and the second three the angles between these vectors
+        in degrees.
+    axes : string
+        Set alignment of sample axes with projection sphere axes. Options:
+        'xyz' (default); 'yzx'; 'zxy'; 'yxz'; 'zyx'; 'xzy'.
+    mask : ndarray of bool, optional
+        Mask to be applied to misorientation angles.
+    user_rot : list 
+        A rotation axis and angle in degrees defined by the user. 
+        Example: [[0,1,0], 90]
+
+    Returns
+    -------
+    mis_ang : ndarray
+        Misorientation angles away from the given fibre in radians.
+    weights : ndarray
+        Weights for each misorientation angle calculated as 1 / sin(mis_ang).
     """
 
 
-    cart_3dpoles = projections.ploject_crystal_poles(fibre, crys='poly', eulers=pole_data,
+    cart_3dpoles = projections.ploject_crystal_poles(fibre, crys='poly', eulers=euler_data,
                                                 proj_type='equal_area', lattice_sys=lattice_system, 
                                                 latt_params=latt_params, pole_type='plane-normal', 
-                                                degrees=True, axes=axes, ret_poles=True)[1]
+                                                degrees=True, axes=axes, ret_poles=True,
+                                                user_rot=user_rot)[1]
     
     sp_3dpoles = coordgeometry.cart2spherical(cart_3dpoles)
 
