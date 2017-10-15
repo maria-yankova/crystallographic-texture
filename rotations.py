@@ -161,8 +161,8 @@ def rotmat2ax_ang(rot_mats, degrees=False):
     if not axes.any():
         raise ValueError('No eigenvalue 1 corresponding to unit eigenvector for'
                          '`rot_mats`. Check `rot_mats` is/are correct.')
-
-    axes = np.linalg.norm(axes, axis=1)
+                         
+    axes = axes / np.linalg.norm(axes, axis=1)
 
     # Convert to radians if necessary
     if degrees:
