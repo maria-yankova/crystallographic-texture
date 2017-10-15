@@ -80,7 +80,8 @@ def stereographic_proj(xyz):
 
 def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=None,
                           pole_type=None, degrees=False, align='cz', crys=None,
-                          rot_mat=None, eulers=None, axes='xyz', ret_poles=False):
+                          rot_mat=None, eulers=None, axes='xyz', ret_poles=False,
+                          user_rot=None):
     """
     Project a set of crystal poles specified using Miller(-Bravais) indices.
 
@@ -95,7 +96,8 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         Lattice system is one of cubic, hexagonal, rhombohedral, tetragonal,
         orthorhombic, monoclinic, triclinic.
     latt_params : list of lenght 6
-        Lattice parameters. The fist three represent the magnitude of each of the lattice vectors.
+        Lattice parameters. The fist three represent the magnitude of each of 
+        the lattice vectors.
         If all three are None, a = b = c = 1.
         If all three angles are None, example angles sets are used as described in Notes.
     degrees : bool, optional
@@ -122,6 +124,9 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         'xyz' (default); 'yzx'; 'zxy'; 'yxz'; 'zyx'; 'xzy'.
     ret_poles : bool, optional (default False)
         Optionally, return the 3d pole vectors before they are projected.
+    user_rot : list 
+        A rotation axis and angle in degrees defined by the user. 
+        Example: [[0,1,0], 90]
 
     Returns
     -------
@@ -190,6 +195,10 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
     else:
         R_ax = rotations.rotate_axes(axes)
 
+    # Find user defined rotation matrix
+    if user_rot:
+        R_usr = rotations.ax_ang2rot_mat(np.array(user_rot[0]), user_rot[1], degrees=True)
+
     if latt_params:
         params_dict = {'a': latt_params[0],
                        'b': latt_params[1],
@@ -231,6 +240,8 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
             for g_i in range(g_poles.shape[1]):
                 pp = np.dot(rot_mat, g_poles[:, g_i]).T
                 ppp = np.dot(np.squeeze(R_ax, axis=0), pp)
+                if user_rot:
+                    ppp = np.dot(np.squeeze(R_usr, axis=0), ppp)
                 proj_poles.append(project(ppp))
         else:
             proj_poles.append(project(g_poles))
