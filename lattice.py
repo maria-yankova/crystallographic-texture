@@ -57,7 +57,7 @@ def reciprocal_lattice_vecs(latt_vecs):
     cvr = np.cross(av, bv) / V
 
     rec_vecs = np.array([avr, bvr, cvr]).T
-
+    
     return rec_vecs
 
 
@@ -300,3 +300,115 @@ def crystal2ortho(lattice_sys=None, a=None, b=None, c=None, α=None, β=None, γ
                       [0.0, c * np.cos(α),  c * np.sin(α)]])
 
     return nu.zero_prec(M)
+
+
+def plane_normal(hkl_plane, latt_sys=None, latt_params=None, degrees=False,
+                 align='cz'):
+    """
+    Get the plane normal in Cartesian coordinates for a plane with Miller 
+    indices (hkl).
+
+    Parameters
+    ----------
+    hkl_plane : list or ndarray 
+        The Miller indices of a crystallographic plane.
+    latt_sys : string, optional
+        Lattice system is one of cubic, hexagonal, rhombohedral, tetragonal,
+        orthorhombic, monoclinic, triclinic.
+    latt_params : list of lenght 6
+        Lattice parameters. The fist three represent the magnitude of each of 
+        the lattice vectors.
+        If all three are None, a = b = c = 1.
+        If all three angles are None, example angles sets are used as described in Notes.
+    degrees : bool, optional
+        Units of `α`, `β`, `γ`. Radians by default.
+    align : string, optional
+        Alignment option between crystal and orthonormal reference frames.
+        Three options implemented (as described in [1]):
+        - 'ax': a-axis || x-axis and c*-axis || z*-axis
+        - 'by': b-axis || y-axis and a*-axis || x*-axis
+        - 'cz': c-axis || z-axis and a*-axis || x*-axis [Default]
+        where * corresponds to reciprocal lattice vectors.
+
+    Returns
+    -------
+    hkl_norm : ndarray
+    
+    """
+    if isinstance(hkl_plane, list):
+        hkl_plane = np.array(hkl_plane)
+
+    if latt_params:
+        params_dict = {'a': latt_params[0],
+                       'b': latt_params[1],
+                       'c': latt_params[2],
+                       'α': latt_params[3],
+                       'β': latt_params[4],
+                       'γ': latt_params[5]}
+        M = lattice.crystal2ortho(latt_sys, **params_dict, normed=True,
+                                  degrees=degrees, align=align)
+    else:
+        M = lattice.crystal2ortho(latt_sys, normed=True,
+                                  degrees=degrees, align=align)
+
+    cell_ortho = np.dot(M.T, np.eye(3))
+    cell_rec = lattice.reciprocal_lattice_vecs(cell_ortho)
+    hkl_norm = np.dot(cell_rec, hkl_plane)
+
+    return hkl_norm
+
+
+
+def plane_from_normal(hkl_norm, latt_sys=None, latt_params=None, degrees=False, align='cz'):
+    """
+    Get the lattice plane Miller indices (hkl) from a plane normal vector in
+    Cartesian coordinates.
+    
+    Parameters
+    ----------
+    hkl_norm : list or ndarray 
+        The Cartesian coordinates for a crystallographic plane normal.
+    latt_sys : string, optional
+        Lattice system is one of cubic, hexagonal, rhombohedral, tetragonal,
+        orthorhombic, monoclinic, triclinic.
+    latt_params : list of lenght 6
+        Lattice parameters. The fist three represent the magnitude of each of 
+        the lattice vectors.
+        If all three are None, a = b = c = 1.
+        If all three angles are None, example angles sets are used as described in Notes.
+    degrees : bool, optional
+        Units of `α`, `β`, `γ`. Radians by default.
+    align : string, optional
+        Alignment option between crystal and orthonormal reference frames.
+        Three options implemented (as described in [1]):
+        - 'ax': a-axis || x-axis and c*-axis || z*-axis
+        - 'by': b-axis || y-axis and a*-axis || x*-axis
+        - 'cz': c-axis || z-axis and a*-axis || x*-axis [Default]
+        where * corresponds to reciprocal lattice vectors.
+    
+    Returns
+    -------
+    hkl_plane : ndarray 
+
+    """
+    if isinstance(hkl_norm, list):
+        hkl_norm = np.array(hkl_norm)
+    
+    if latt_params:
+        params_dict = {'a': latt_params[0],
+                       'b': latt_params[1],
+                       'c': latt_params[2],
+                       'α': latt_params[3],
+                       'β': latt_params[4],
+                       'γ': latt_params[5]}
+        M = lattice.crystal2ortho(latt_sys, **params_dict, normed=True,
+                                  degrees=degrees, align=align)
+    else:
+        M = lattice.crystal2ortho(latt_sys, normed=True,
+                                  degrees=degrees, align=align)
+        
+    cell_ortho = np.dot(M.T, np.eye(3))
+    cell_rec = lattice.reciprocal_lattice_vecs(cell_ortho)
+    hkl_plane = np.dot(np.linalg.inv(cell_rec), hkl_norm)
+    
+    return hkl_plane
