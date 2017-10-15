@@ -157,12 +157,10 @@ def rotmat2ax_ang(rot_mats, degrees=False):
 
     # Find eigenvalues, eigenvectors for `rot_mats`
     eigval, eigvec = np.linalg.eig(rot_mats)
-    axes = np.real(eigvec[np.where(abs(eigval - 1) < 1e-7)])
+    axes = np.real(eigvec[:, np.where(abs(eigval - 1) < 1e-7)]).squeeze().T
     if not axes.any():
         raise ValueError('No eigenvalue 1 corresponding to unit eigenvector for'
                          '`rot_mats`. Check `rot_mats` is/are correct.')
-                         
-    axes = axes / np.linalg.norm(axes, axis=1)
 
     # Convert to radians if necessary
     if degrees:
