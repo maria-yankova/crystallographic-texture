@@ -1,5 +1,6 @@
 import numpy as np
 import numutils as nu
+import coordgeometry
 
 
 def lattice_params_from_vecs(latt_vecs):
@@ -447,7 +448,7 @@ def cart2miller(vec, lat, tol, max_iter=10):
     search_size = 1
     count = 0
     while min_diff > tol_dist:
-        vecs_lat = vectors.find_unique_int_vecs(search_size).T
+        vecs_lat = coordgeometry.find_unique_int_vecs(search_size).T
         vecs_std = np.dot(lat, vecs_lat)
         vecs_std_unit = vecs_std / np.linalg.norm(vecs_std, axis=0)
 

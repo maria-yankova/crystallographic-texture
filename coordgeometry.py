@@ -257,3 +257,73 @@ def get_box_xyz(box, origin=None, faces=False):
         xyz = dict(zip(faceNames, coords))
 
     return xyz
+
+
+def find_unique_int_vecs(s):
+    """
+    Find non-collinear integer vectors within an origin-centered cube of given
+    size.
+
+    The zero vector is excluded.
+
+    Parameters
+    ----------
+    s : int
+        Size of half the cube edge, such that vectors have maximum component
+        |s|.
+
+    Returns
+    -------
+    ndarray
+        Array of row vectors.
+
+    Examples
+    --------
+    >>> find_unique_int_vecs(1)
+    [[ 0  0  1]
+     [ 0  1  0]
+     [ 0  1  1]
+     [ 0  1 -1]
+     [ 1 -1  0]
+     [ 1 -1  1]
+     [ 1 -1 -1]
+     [ 1  0  0]
+     [ 1  0  1]
+     [ 1  0 -1]
+     [ 1  1  0]
+     [ 1  1  1]
+     [ 1  1 -1]]
+
+    """
+
+    s_i = np.zeros((2 * s) + 1, dtype=int)
+    s_i[1::2] = np.arange(1, s + 1)
+    s_i[2::2] = -np.arange(1, s + 1)
+
+    a = np.vstack(np.meshgrid(s_i, s_i, s_i)).reshape((3, -1)).T
+    a[:, [0, 1]] = a[:, [1, 0]]
+
+    # Remove the zero vector
+    a = a[1:]
+
+    # Use cross product to find which vectors are collinear
+    c = np.cross(a, a[:, np.newaxis])
+    w = np.where(np.all(c == 0, axis=-1).T)
+
+    all_remove_idx = []
+
+    # Get the indices of collinear vectors
+    for i in set(w[0]):
+
+        col_idx = np.where(w[0] == i)[0]
+
+        if len(col_idx) != 1:
+            all_remove_idx.extend(w[1][col_idx[1:]])
+
+    all_remove_idx = list(set(all_remove_idx))
+
+    # Remove collinear vectors
+    a = np.delete(a, all_remove_idx, axis=0)
+    a = a[np.lexsort((a[:, 1], a[:, 0]))]
+
+    return a
