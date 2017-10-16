@@ -411,3 +411,55 @@ def plane_from_normal(hkl_norm, latt_sys=None, latt_params=None, degrees=False, 
     hkl_plane = np.dot(np.linalg.inv(cell_rec), hkl_norm)
 
     return hkl_plane
+
+
+def cart2miller(vec, lat, tol, max_iter=10):
+    """
+    Convert a Cartesian vector into Miller indices within a particular lattice.
+
+    Parameters
+    ----------
+    vec : ndarray of shape (3, 1)
+        Cartesian vector whose direction in Miller indices is to be found.
+    lat : ndarray of shape (3, 3)
+        Column vectors representing the lattice unit cell
+    tol : float
+        Snapping angular tolerance in degrees.
+    max_iter : int, optional
+        Maximum number of search size increments. By default, set to 10.
+
+    Returns 
+    -------
+    ndarray of shape (3, 1)
+
+    """
+
+    tol_dist = np.tan(np.radians(tol))
+
+    vec_unit = vec / np.linalg.norm(vec, axis=0)
+
+    if (vec_unit[0, 0] < 0 or
+            np.isclose(vec_unit[0, 0], 0) and vec_unit[1, 0] < 0):
+        vec_unit *= -1
+
+    mill = None
+    min_diff = tol_dist + 1
+    search_size = 1
+    count = 0
+    while min_diff > tol_dist:
+        vecs_lat = vectors.find_unique_int_vecs(search_size).T
+        vecs_std = np.dot(lat, vecs_lat)
+        vecs_std_unit = vecs_std / np.linalg.norm(vecs_std, axis=0)
+
+        diff = vecs_std_unit - vec_unit
+        diff_mag = np.linalg.norm(diff, axis=0)
+        min_diff_idx = np.argmin(diff_mag)
+        min_diff = diff_mag[min_diff_idx]
+        mill = vecs_lat[:, min_diff_idx]
+        search_size += 1
+        count += 1
+        if count > max_iter:
+            raise ValueError(
+                'Could not find Miller indices in {} iterations.'.format(max_iter))
+
+    return mill
