@@ -164,18 +164,19 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
     # Check valid entry for rot_mat and eulers
     if crys == 'poly':
         if rot_mat and eulers:
-            raise ValueError('Specify either `rot_mat` or `eulers` but not both.')
+            raise ValueError(
+                'Specify either `rot_mat` or `eulers` but not both.')
         elif eulers is not None:
             rot_mat = np.linalg.inv(
                 rotations.euler2rot_mat_n(eulers, degrees=True))
         elif rot_mat is None and eulers is None:
             raise ValueError('Please specify `rot_mat` or `eulers` corresponding to'
-                         'orientation of individual poles in polycrystal.')
+                             'orientation of individual poles in polycrystal.')
     elif crys == 'single' and rot_mat:
         raise ValueError('"{}" and "{}" is not a valid set of options for `crys`'
                          ' and `rot_mat`. Specify either `crys`=\'single\' or '
                          '`crys`=\'poly\' and `rot_mat`'.format(crys, rot_mat))
-    
+
     # Check valid entry for projection type
     proj_opt = {'stereographic': stereographic_proj,
                 'equal_area': equal_area_proj}
@@ -197,7 +198,8 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
 
     # Find user defined rotation matrix
     if user_rot:
-        R_usr = rotations.ax_ang2rot_mat(np.array(user_rot[0]), user_rot[1], degrees=True)
+        R_usr = rotations.ax_ang2rot_mat(
+            np.array(user_rot[0]), user_rot[1], degrees=True)
 
     if latt_params:
         params_dict = {'a': latt_params[0],
@@ -261,7 +263,6 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         return proj_poles
 
 
-
 def bin_proj_poles(proj_poles, bins=50, normed=True):
     """
     Compute the histograms of projected poles data points.
@@ -297,6 +298,5 @@ def bin_proj_poles(proj_poles, bins=50, normed=True):
         H, xedges, yedges = np.histogram2d(x, y, bins=bins, normed=normed)
 
         Hs.append(np.flipud(np.fliplr(H)))
-
 
     return Hs, xedges, yedges
