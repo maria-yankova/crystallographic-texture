@@ -83,6 +83,36 @@ def angle_0_to_pi(angles):
 
     return angles
 
+def wrap_angle(angles, min_ang, max_ang, degrees=True):
+    """
+    Wrap angles between min_ang and max_ang.
+
+    Parameters
+    ----------
+    angles : ndarray
+        Array of angles.
+    min_ang: float
+        Minimum angle in radians or degrees.
+    max_ang: float
+        Maximum angle in radians or degrees.
+    degrees: bool
+        Unit of angles, min_ang and max_ang.
+
+    Returns
+    -------
+    angles : ndarray
+        Array of wrapped angles.
+    TODO:
+    - get rid of angle_0_to_pi
+    - add radians option
+
+    """
+    if degrees:
+        np.putmask(angles, angles >= (max_ang - min_ang), angles - max_ang)
+
+        return angles
+    else:
+        raise ValueError('Radians option not implemented.')
 
 def polar2cart_2D(r, θ):
     """
@@ -327,3 +357,35 @@ def find_unique_int_vecs(s):
     a = a[np.lexsort((a[:, 1], a[:, 0]))]
 
     return a
+
+
+def norm_vec(vec):
+    """
+    Normalise a vector
+
+    """
+    if isinstance(vec) == list:
+        vec = np.array(vec)
+
+    return vec / np.linalg.norm(vec)
+
+
+def point_in_poly(poly_vert, points):
+    """
+    Check if points lie in or out of a polygon.
+    
+    Parameters
+    ----------
+    poly_vert : ndarray or list
+        Vertices of polygon.
+    points: ndarray of shape (N, 2)
+        Points coordinates.
+    
+    Returns
+    -------
+    bool of shape (N, 1)
+    
+    """
+    path = mpltPath.Path(poly_vert)
+    
+    return path.contains_points(points)
