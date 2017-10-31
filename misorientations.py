@@ -5,7 +5,7 @@ import rotations
 
 
 def fibre_misorientation(fibre, euler_data, lattice_system, latt_params,
-                         axes='xyz', mask=None, user_rot=None):
+                         axes='xyz', mask=None, user_rot=None, ret_poles=True):
     """
     Find the misorientation away from a fibre texture.
 
@@ -54,7 +54,10 @@ def fibre_misorientation(fibre, euler_data, lattice_system, latt_params,
     mis_ang = np.ma.array(mis_ang, mask=mask)
     weights = 1 / (np.sin(mis_ang.compressed()))
 
-    return mis_ang, weights
+    if ret_poles:
+        return mis_ang, weights, cart_3dpoles
+    else:
+        return mis_ang, weights
 
 
 def misorientation_pair(eulers1, eulers2, degrees=True, ax_ang=True):
