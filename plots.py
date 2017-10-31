@@ -156,10 +156,111 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
 
     return f
 
+def plot_lattice(lattice_sys, align='cz'):
+    """
+    Plot lattice in a Cartesian reference frame.
+
+    Parameters
+    ----------
+    lattice_sys : string, optional
+        Lattice system is one of cubic, hexagonal, rhombohedral, tetragonal, 
+        orthorhombic, monoclinic, triclinic.
+    align : string
+        Alignment option between crystal and orthonormal reference frames. 
+        Three options implemented (as described in [1]): 
+        - 'ax': a-axis || x-axis and c*-axis || z*-axis
+        - 'by': b-axis || y-axis and a*-axis || x*-axis
+        - 'cz': c-axis || z-axis and a*-axis || x*-axis [Default]
+        where * corresponds to reciprocal lattice vectors. 
+    Returns
+    -------
+
+
+    References
+    ----------
+    [1] Giacovazzo et al.(2002) Fundamentals of Crystallography. Oxf Univ Press. p. 75-76.
+
+    """
+
+    M = lattice.crystal2ortho(lattice_sys, normed=True, degrees=True)
+
+    cell_e = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]]).T
+
+    # Crystal vectors in orthonormal basis as column vectors
+    cell_ortho = np.dot(M.T, cell_e)
+    box = coordgeometry.get_box_xyz(cell_ortho).T
+
+    # Crystal unit vectors in Cartesian coordinates
+    pole_vecs = np.stack((np.zeros((cell_ortho.shape)), cell_ortho),axis=0)
+    # Labels
+    poles_lbl = []
+    for i in range(cell_e.shape[1]):
+        poles_lbl.append(
+            '[' + ''.join([str(int(x)) for x in cell_e[:, i]]) + ']')
+
+    legend_name = lattice_sys + ' cell'
+    fig_size = [400, 400]
+    clrs = ['red', 'blue', 'orange']
+
+    trace1 = go.Scatter3d(
+            x=box[:, 0].ravel(),
+            y=box[:, 1].ravel(),
+            z=box[:, 2].ravel(),
+            mode='lines',
+            marker=dict(color='darkgrey'),
+            legendgroup=legend_name, name=legend_name)
+
+    traces=[]  
+    data = [trace1]
+    for i in range(pole_vecs.shape[2]):
+            data.append(
+                go.Scatter3d(
+                    x=pole_vecs[:, 0, i],
+                    y=pole_vecs[:, 1, i],
+                    z=pole_vecs[:, 2, i],
+                    mode='lines',
+                    marker=dict(color=clrs[i]),
+                    legendgroup=poles_lbl[i], name=poles_lbl[i])
+            )
+    camera = dict(
+        up=dict(x=0, y=0, z=1),
+        center=dict(x=0, y=0, z=0),
+        eye=dict(x=-0.1, y=-2.5, z=-0.1)
+    )
+
+    layout = go.Layout(autosize=False,
+                        width=fig_size[0],
+                        height=fig_size[1],
+
+                        legend=dict(traceorder='grouped', x=10, bordercolor='#FFFFFF',
+                                    borderwidth=10, xanchor='right', yanchor='top'),
+                        margin=go.Margin(l=20, r=20, b=20, t=20, pad=20),
+                        scene=dict(
+                            camera=camera,
+                            xaxis=dict(showgrid=False, zeroline=False,
+                                        showline=True,
+                                        ticks='',
+                                        showticklabels=False),
+                            yaxis=dict(showgrid=False,
+                                        zeroline=True,
+                                        showline=False,
+                                        ticks='',
+                                        showticklabels=False),
+                            zaxis=dict(showgrid=False,
+                                        zeroline=True,
+                                        showline=False,
+                                        ticks='',
+                                        showticklabels=False)
+                        ),
+                        )
+
+    f = go.Figure(data=data, layout=layout)
+
+    return f
 
 def plot_crystal_poles(poles, lattice_sys, pole_type, clrs):
     """
-    Plot a single crystal and specified poles.abs
+    Plot a single crystal and specified poles.
 
     TODO:
     - 
