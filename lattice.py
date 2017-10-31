@@ -62,12 +62,29 @@ def reciprocal_lattice_vecs(latt_vecs):
     return rec_vecs
 
 
-def reciprocal_lattice_params(latt_params):
+def reciprocal_lattice_params(latt_params, degrees=False):
     """
     Return the reciprocal lattice parameters from real 
     space lattice parameters.
+
+    Parameters
+    ----------
+    latt_params : list
+        Real space lattice parameters in order: a, b, c, α, β, γ.
+    degrees : bool
+        Units of angles.
+
+    Returns
+    -------
+    rec_params : list
+        Reciprocal lattice parameter in order: ar, br, cr, αr, βr, γr.
+
     """
     a, b, c, α, β, γ = latt_params
+
+    if degrees: 
+        α, β, γ = [np.radians(ang) for ang in [α, β, γ]]
+
     V = a * b * c * (1 - np.cos(α)**2 - np.cos(β)**2 - np.cos(γ)**2
                      + 2 * np.cos(α) * np.cos(β) * np.cos(γ))**0.5
 
