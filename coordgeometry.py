@@ -83,7 +83,7 @@ def angle_0_to_pi(angles):
 
     return angles
 
-def wrap_angle(angles, min_ang, max_ang, degrees=True):
+def wrap_angles(angles, min_ang, max_ang, degrees=True):
     """
     Wrap angles between min_ang and max_ang.
 
