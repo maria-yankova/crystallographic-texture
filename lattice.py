@@ -320,8 +320,8 @@ def crystal2ortho(lattice_sys=None, a=None, b=None, c=None, α=None, β=None, γ
     return nu.zero_prec(M)
 
 
-def plane_normal(hkl_plane, latt_sys=None, latt_params=None, degrees=False,
-                 align='cz'):
+def plane_normal(hkl_plane, latt_vecs = None, latt_sys=None, latt_params=None, 
+                degrees=False, align='cz', normed=False):
     """
     Get the plane normal in Cartesian coordinates for a plane with Miller 
     indices (hkl).
@@ -330,9 +330,12 @@ def plane_normal(hkl_plane, latt_sys=None, latt_params=None, degrees=False,
     ----------
     hkl_plane : list or ndarray 
         The Miller indices of a crystallographic plane.
+    latt_vecs : ndarray of shape (3, 3), optional
+        Row vectors representing the lattive unit cell in a Cartesian reference frame.
+        See Notes.
     latt_sys : string, optional
         Lattice system is one of cubic, hexagonal, rhombohedral, tetragonal,
-        orthorhombic, monoclinic, triclinic.
+        orthorhombic, monoclinic, triclinic. See Notes.
     latt_params : list of lenght 6
         Lattice parameters. The fist three represent the magnitude of each of 
         the lattice vectors.
@@ -347,16 +350,29 @@ def plane_normal(hkl_plane, latt_sys=None, latt_params=None, degrees=False,
         - 'by': b-axis || y-axis and a*-axis || x*-axis
         - 'cz': c-axis || z-axis and a*-axis || x*-axis [Default]
         where * corresponds to reciprocal lattice vectors.
+    normed : bool
+        Option to normalise the plane normal. True by default.
 
     Returns
     -------
     hkl_norm : ndarray
 
+    Notes
+    -----
+    Specify either latt_vecs or latt_sys (and latt_params, optional).
+
+    TODO: 
+    Sort out checks for specifying lattice.
+    Align option default only if latt_sys given. For latt_vecs, alignment is 
+    already done.  
+
     """
     if isinstance(hkl_plane, list):
         hkl_plane = np.array(hkl_plane)
 
-    if latt_params:
+    if latt_vecs:
+        M = latt_vecs
+    elif latt_params:
         params_dict = {'a': latt_params[0],
                        'b': latt_params[1],
                        'c': latt_params[2],
@@ -372,6 +388,9 @@ def plane_normal(hkl_plane, latt_sys=None, latt_params=None, degrees=False,
     cell_ortho = np.dot(M.T, np.eye(3))
     cell_rec = reciprocal_lattice_vecs(cell_ortho)
     hkl_norm = np.dot(cell_rec, hkl_plane)
+    print(hkl_norm)
+    if normed:
+        hkl_norm = hkl_norm / np.linalg.norm(hkl_norm)
 
     return hkl_norm
 
