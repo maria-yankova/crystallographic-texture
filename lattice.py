@@ -82,7 +82,7 @@ def reciprocal_lattice_params(latt_params, degrees=False):
     """
     a, b, c, α, β, γ = latt_params
 
-    if degrees: 
+    if degrees:
         α, β, γ = [np.radians(ang) for ang in [α, β, γ]]
 
     V = a * b * c * (1 - np.cos(α)**2 - np.cos(β)**2 - np.cos(γ)**2
@@ -320,8 +320,8 @@ def crystal2ortho(lattice_sys=None, a=None, b=None, c=None, α=None, β=None, γ
     return nu.zero_prec(M)
 
 
-def plane_normal(hkl_plane, latt_vecs = None, latt_sys=None, latt_params=None, 
-                degrees=False, align='cz', normed=False):
+def plane_normal(hkl_plane, latt_vecs=None, latt_sys=None, latt_params=None,
+                 degrees=False, align='cz', normed=False):
     """
     Get the plane normal in Cartesian coordinates for a plane with Miller 
     indices (hkl).
@@ -370,7 +370,7 @@ def plane_normal(hkl_plane, latt_vecs = None, latt_sys=None, latt_params=None,
     if isinstance(hkl_plane, list):
         hkl_plane = np.array(hkl_plane)
 
-    if latt_vecs:
+    if latt_vecs is not None:
         M = latt_vecs
     elif latt_params:
         params_dict = {'a': latt_params[0],
@@ -388,9 +388,8 @@ def plane_normal(hkl_plane, latt_vecs = None, latt_sys=None, latt_params=None,
     cell_ortho = np.dot(M.T, np.eye(3))
     cell_rec = reciprocal_lattice_vecs(cell_ortho)
     hkl_norm = np.dot(cell_rec, hkl_plane)
-    print(hkl_norm)
     if normed:
-        hkl_norm = hkl_norm / np.linalg.norm(hkl_norm)
+        hkl_norm = hkl_norm / np.linalg.norm(hkl_norm, axis=0)
 
     return hkl_norm
 
