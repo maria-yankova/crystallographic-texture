@@ -2,6 +2,7 @@ import coordgeometry
 import projections
 import numpy as np
 import rotations
+from symmetry import SYM_OPS
 
 
 def fibre_misorientation(fibre, euler_data, lattice_system, latt_params,
@@ -78,3 +79,122 @@ def misorientation_pair(eulers1, eulers2, degrees=True, ax_ang=True):
 
     if ax_ang:
         return ax_ang_12
+
+
+def euler_pair_disorientation(eulers_A, eulers_B, point_group,
+                              degrees_in=False, degrees_out=False):
+    """
+    Calculate disorientation axis and angle between a pair of orientations
+    given in Euler angles in Bunge notation. Direction for rotation is A to B.
+
+    Notes
+    -----
+    Euler angles are expected in Bunge notation (intrinsic, ZXZ passive 
+    rotations, i.e. from sample to crystal coordinate system).
+
+    Parameters
+    ----------
+    eulers_A : ndarray of shape (3,)
+        See notes.
+    eulers_B : ndarray of shape (3,)
+        See notes.
+    point_group : str
+        One of "6/mmm", "cubic", "triclinic"
+    degrees_in : bool, optional
+        If True `eulers_A` and `eulers_B` values are interpreted as degrees, 
+        otherwise as radians. False by default.
+    degrees_out : bool, optional
+        If True, disorientation angle is returned in degrees, otherwise in
+        radians. False by default.
+
+    Returns
+    -------
+    tuple of ndarray (axis, angle)
+        axis : ndarray of shape (3, 1)
+        angle : float
+            Disorientation angle in radians or degrees.
+    """
+
+    ax, ang = euler_pair_disorientation_all(eulers_A, eulers_B, point_group,
+                                            degrees_in, degrees_out)
+
+    return (ax[0], ang)
+
+
+def euler_pair_disorientation_all(eulers_A, eulers_B, point_group,
+                                  degrees_in=False, degrees_out=False):
+    """
+    Calculate all equivalent disorientations between a pair of orientations
+    given in Euler angles in Bunge notation. Direction for rotation is A to B.
+
+    Symmetrically equivalent axes may be returned for one disorientation
+    angle.
+
+    Notes
+    -----
+    Euler angles are expected in Bunge notation (intrinsic, ZXZ passive 
+    rotations, i.e. from sample to crystal coordinate system).
+
+    Parameters
+    ----------
+    eulers_A : ndarray of shape (3,)
+        See notes.
+    eulers_B : ndarray of shape (3,)
+        See notes.
+    point_group : str
+        One of "6/mmm", "cubic", "triclinic"
+    degrees_in : bool, optional
+        If True `eulers_A` and `eulers_B` values are interpreted as degrees, 
+        otherwise as radians. False by default.
+    degrees_out : bool, optional
+        If True, disorientation angle is returned in degrees, otherwise in
+        radians. False by default.
+
+    Returns
+    -------
+    tuple of ndarray (axis, angle)
+        axis : ndarray of shape (3, N)
+            Column vectors representing symmetrically-equivalent disorientation
+            axes.
+        angle : float
+            Disorientation angle in radians or degrees.
+
+
+    """
+    sym_ops = SYM_OPS[point_group]
+
+    rot_A = rotations.euler2rot_mat_n(eulers_A, degrees=degrees_in)[0]
+    rot_B = rotations.euler2rot_mat_n(eulers_B, degrees=degrees_in)[0]
+
+    mis_rot = np.ones((len(S)**2, 3, 3)) * np.nan
+    mis_ax = np.ones((len(S)**2, 3)) * np.nan
+    mis_ang = np.ones((len(S)**2)) * np.nan
+
+    s_idx = 0
+
+    for sym_A in sym_ops:
+
+        inv_rot_A_sym = np.linalg.inv(sym_A @ rot_A)
+
+        for sym_B in sym_ops:
+
+            rot_B_sym = sym_B @ rot_B
+            r_i = rot_B_sym @ inv_rot_A_sym
+            ax_i, ang_i = rotations.rotmat2axang(r_i)
+
+            mis_rot[s_idx] = r_i
+            mis_ax[s_idx] = ax_i
+            mis_ang[s_idx] = ang_i
+
+            s_idx += 1
+
+    if degrees_out:
+        mis_ang = np.rad2deg(mis_ang)
+
+    dis_idx = np.where(np.isclose(mis_ang, np.min(mis_ang)))
+
+    dis_rot = mis_rot[dis_idx]
+    dis_ax = mis_ax[dis_idx]
+    dis_ang = mis_ang[dis_idx]
+
+    return (dis_ax, dis_ang[0])

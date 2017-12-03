@@ -124,50 +124,85 @@ def ax_ang2rot_mat(axes, angles, degrees=False):
     return rot_mats
 
 
-def rotmat2ax_ang(rot_mats, degrees=False):
+def rotmat2axang(rot_mat, degrees=False):
     """
-    Converts rotation matrices to a set of rotation axes and angles.
+    Convert a rotation matrix into axis-angle representation.
 
     Parameters
     ----------
-    rot_mat : ndarray
-        Array of shape (N, 3, 3) or (3, 3). 
-
-    degrees : bool (optional)
-        If True, `angles` interpreted as degrees.
+    rot_mat : ndarray of shape (3, 3)
+        Rotation matrix which pre-multiplies column vectors.
+    degrees : bool, optional
+        If True, returns angle in degrees, otherwise in radians.
 
     Returns
     -------
-    axes : ndarray
-        Array of shape (N,3), where N unit vectors are the rotation axes.
-    angles : ndarray
-        Array of shape (N,), where N is the number of angles corresponding to `axes`.
+    tuple of (axis, angle)
+        axis : ndarray of shape (3,)
+        angle : float
 
     Notes
     -----
-    Computed using the eigenvalues and eigenvectors of a rotation matrix. 
+    Following similar function in Matlab from here:
+    https://github.com/marcdegraef/3Drotations/blob/master/src/MatLab/om2ax.m 
+
+    TODO:
+    - Understand `P` factor in  http://doi.org/10.1088/0965-0393/23/8/083501
+      and apply here if necessary.
+    - Vectorise
+    - Add unit tests
 
     """
 
+    tol = 1e-10
+
     # Check dimensions
-    if rot_mats.ndim == 3:
-        rot_mats = rot_mats.squeeze()
- 
-    angles = np.arccos(0.5 * (np.matrix.trace(rot_mats, axis1=0, axis2=1) - 1))
+    if rot_mat.ndim == 3:
+        rot_mat = rot_mat.squeeze()
 
-    # Find eigenvalues, eigenvectors for `rot_mats`
-    eigval, eigvec = np.linalg.eig(rot_mats)
+    trc = np.trace(rot_mat)
+    ang = np.arccos(np.clip(0.5 * (trc - 1), -1, 1))
 
-    axes = np.real(eigvec[:, np.where(abs(eigval - 1) < 1e-7)]).squeeze().T
-    if not axes.any():
-        raise ValueError('No eigenvalue 1 corresponding to unit eigenvector for'
-                         '`rot_mats`. Check `rot_mats` is/are correct.')
+    if np.isclose(ang, 0.0):
 
-    # Convert to radians if necessary
-    if degrees:
-        angles = np.degrees(angles)
+        # Set axis to [001] if angle is 0.
+        ax = np.array([0, 0, 1])
 
-    return axes, angles
+    else:
+
+        # Find eigenvalues, eigenvectors for `rot_mat`
+        eigval, eigvec = np.linalg.eig(rot_mat)
+
+        # Get index of eigenvalue which is 1 + 0i
+        eig_cond = np.logical_and(
+            abs(np.real(eigval) - 1) < tol,
+            abs(np.imag(eigval) < tol)
+        )
+
+        if np.sum(eig_cond) != 1:
+            raise ValueError(
+                'Not exactly one eigenvector with eigenvalue of 1 found.')
+
+        # Set the axes to eigenvector with eigenvalue = 1
+        # Determine the sign of each component using the conditions below.
+        ax = np.real(eigvec[:, np.where(eig_cond)[0]]).squeeze()
+
+        if (rot_mat[2, 1] - rot_mat[1, 2]) != 0:
+            s = np.sign(rot_mat[2, 1] - rot_mat[1, 2])
+            ax[0] = s * abs(ax[0])
+
+        if (rot_mat[0, 2] - rot_mat[2, 0]) != 0:
+            s = np.sign(rot_mat[0, 2] - rot_mat[2, 0])
+            ax[1] = s * abs(ax[1])
+
+        if (rot_mat[1, 0] - rot_mat[0, 1]) != 0:
+            s = np.sign(rot_mat[1, 0] - rot_mat[0, 1])
+            ax[2] = s * abs(ax[2])
+
+        if degrees:
+            ang = np.degrees(ang)
+
+    return ax, ang
 
 
 def euler2rot_mat_n(angles, degrees=False):
