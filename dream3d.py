@@ -1,0 +1,535 @@
+"""Module for interacting with data output from Dream.3D in HDF format."""
+
+import numpy as np
+import yaml
+import h5py
+from numutils import get_from_dict, index_lst
+
+from plotly.offline import plot, iplot, init_notebook_mode
+from plotly import graph_objs as go
+
+import rotations
+import numutils
+import coordgeometry
+
+
+class Mesh(object):
+    """Class to represent a surface/interface mesh"""
+
+    def __init__(self, vert, mesh_idx, cent):
+
+        self.vert = vert
+        self.mesh_idx = mesh_idx
+        self.cent = cent
+
+        # These are assigned if `fit_plane` is invoked.
+        self.mean = None
+        self.plane_equation = None
+        self.normal = None
+        self.fit_to = None
+
+    def fit_plane(self, fit_to='centroids'):
+
+        if fit_to == 'centroids':
+            points = self.cent
+        elif fit_to == 'vertices':
+            points = self.vert
+
+        (a, b, c), mean = numutils.fit_plane(points)
+
+        self.mean = mean
+        self.plane_equation = np.array([a, b, c])
+        self.normal = np.array([[a, b, -1]]).T
+        self.fit_to = points
+
+    def get_plane_points(self, x, y):
+
+        if self.plane_equation is None:
+            raise ValueError('There is no fitted plane. Invoke `fit_plane` and'
+                             ' try again.')
+
+        z = numutils.plane(x, y, *self.plane_equation)
+        return z
+
+    def visualise(self, do_iplot=False, show_grid=True, show_plane=False,
+                  plane_args=None, show_normal=False, invert_normal=False,
+                  normal_args=None):
+
+        if plane_args is None:
+            plane_args = {}
+        if normal_args is None:
+            normal_args = {}
+
+        plane_args_def = {
+            'opacity': 0.8,
+        }
+        normal_args_def = {}
+
+        plane_args = {**plane_args_def, **plane_args}
+        normal_args = {**normal_args_def, **normal_args}
+
+        traces = [
+            {
+                'type': 'mesh3d',
+                'x': self.vert[0],
+                'y': self.vert[1],
+                'z': self.vert[2],
+                'i': self.mesh_idx[0],
+                'j': self.mesh_idx[1],
+                'k': self.mesh_idx[2],
+                'opacity': 1,
+            },
+            {
+                'type': 'scatter3d',
+                'x': self.vert[0],
+                'y': self.vert[1],
+                'z': self.vert[2],
+                'mode': 'markers',
+                'name': 'Vertices',
+                'marker': {
+                    'size': 3,
+                },
+            },
+            {
+                'type': 'scatter3d',
+                'x': self.cent[0],
+                'y': self.cent[1],
+                'z': self.cent[2],
+                'mode': 'markers',
+                'name': 'Centroids',
+                'marker': {
+                    'size': 3,
+                },
+            },
+        ]
+
+        if show_plane or show_normal:
+
+            if self.plane_equation is None:
+                raise ValueError('There is no plane/normal to show. Invoke '
+                                 '`fit_plane` and try again.')
+
+            if show_plane:
+
+                # Get coordinates for fitted plane mesh
+                plane_xy = coordgeometry.get_xy_bounding_trace(
+                    self.fit_to[0] - self.mean[0, 0],
+                    self.fit_to[1] - self.mean[1, 0])
+
+                plane_z = self.get_plane_points(*plane_xy)
+
+                plane_trace = {
+                    'type': 'mesh3d',
+                    'x': plane_xy[0] + self.mean[0, 0],
+                    'y': plane_xy[1] + self.mean[1, 0],
+                    'z': plane_z + self.mean[2],
+                    **plane_args,
+                }
+                traces.append(plane_trace)
+
+            if show_normal:
+
+                scale_norm = -1 if invert_normal else 1
+                normx, normy, normz = scale_norm * self.normal[:, 0]
+                meanx, meany, meanz = self.mean[:, 0]
+
+                norm_trace = {
+                    'type': 'scatter3d',
+                    'mode': 'lines',
+                    'x': [meanx, meanx + normx],
+                    'y': [meany, meany + normy],
+                    'z': [meanz, meanz + normz],
+                    **normal_args
+                }
+                traces.append(norm_trace)
+
+        layout = {
+            'scene': {
+                'aspectmode': 'data'
+            },
+            'height': 800,
+            'width': 800,
+            'showlegend': True,
+        }
+
+        if not show_grid:
+
+            hide_ax_props = dict(
+                showgrid=False,
+                zeroline=False,
+                showline=False,
+                showticklabels=False,
+                title='',
+            )
+
+            layout['scene'].update({
+                'aspectmode': 'data',
+                'xaxis': {
+                    **hide_ax_props,
+                },
+                'yaxis': {
+                    **hide_ax_props,
+                },
+                'zaxis': {
+                    **hide_ax_props,
+                },
+            })
+
+        fig = go.Figure(data=traces, layout=layout)
+
+        if do_iplot:
+            init_notebook_mode()
+            iplot(fig)
+
+        return fig
+
+
+class Dream3d(object):
+
+    def __init__(self, opt):
+
+        d3d = h5py.File(opt['filepath'], 'r')
+
+        tri_data_path = [opt['all_data'], opt['tri_data']]
+        img_data_path = [opt['all_data'], opt['img_data']]
+
+        face_data_path = tri_data_path + [opt['face_data']]
+        tri_geom_path = tri_data_path + [opt['tri_geom']]
+
+        cell_feat_data_path = img_data_path + [opt['cell_feat_data']]
+
+        face_labs_path = face_data_path + [opt['face_labels']]
+        face_areas_path = face_data_path + [opt['face_areas']]
+        face_cent_path = face_data_path + [opt['face_centroids']]
+        shared_tri_path = tri_geom_path + [opt['tri_list']]
+        shared_vert_path = tri_geom_path + [opt['vert_list']]
+
+        self.all_neighbours = None
+        self.grain_ids = None
+        self.neighbours = None
+
+        if opt.get('neigh_list') is not None:
+            all_neigh_path = cell_feat_data_path + [opt['neigh_list']]
+            self.all_neighbours = np.array(get_from_dict(d3d, all_neigh_path))
+            self.set_grain_neighbours()
+
+        num_neigh_path = cell_feat_data_path + [opt['neigh_num']]
+        eulers_path = cell_feat_data_path + [opt['avg_euler']]
+        num_grn_elms_path = cell_feat_data_path + [opt['num_elements']]
+        elm_grn_ids_path = img_data_path + \
+            [opt['cell_data'], opt['cell_feat_id']]
+
+        self.face_labels = np.array(get_from_dict(d3d, face_labs_path))
+        self.face_areas = np.array(get_from_dict(d3d, face_areas_path))
+        self.face_centroids = np.array(get_from_dict(d3d, face_cent_path))
+        self.shared_tri = np.array(get_from_dict(d3d, shared_tri_path))
+        self.shared_vert = np.array(get_from_dict(d3d, shared_vert_path))
+
+        self.num_neighbours = np.array(get_from_dict(d3d, num_neigh_path))
+        self.eulers = np.array(get_from_dict(d3d, eulers_path))
+        self.num_grain_elements = np.array(
+            get_from_dict(d3d, num_grn_elms_path)[:, 0])
+        self.element_grain_ids = np.array(get_from_dict(d3d, elm_grn_ids_path))
+
+    @classmethod
+    def from_file_options(cls, opt_file_path):
+
+        with open(opt_file_path, 'r') as f:
+            opt = yaml.safe_load(f)
+
+        return cls(opt)
+
+    def set_grain_neighbours(self):
+
+        if all([i is not None for i in [self.neighbours,  self.grain_ids]]):
+            raise ValueError('Grain neighbours are already set.')
+
+        # Identify unique grain IDs
+        self.grain_ids = np.array(list(
+            set(self.element_grain_ids.flatten())
+        ))
+
+        # Identify grain neighours
+        neighbours = []
+        for i in self._get_grain_neighbours_idx(self.num_neighbours):
+            neighbours.append(np.array(index_lst(self.all_neighbours, i)))
+
+        self.neighbours = neighbours
+
+    def _get_grain_neighbours_idx(self, num_neighbours):
+        """
+        Get the grain IDs which neighbour a given grain ID.
+
+        Parameters
+        ----------
+        num_neighbours : list of int
+            The number of neighbours for each grain ID.
+
+        Returns
+        -------
+        list of list of int
+            The grain IDs which neighbour a given grain.
+
+        """
+
+        neigh_idx = []
+        cumtot = 0
+        for nn in num_neighbours:
+
+            start_idx = cumtot
+            cumtot += nn[0]
+            end_idx = cumtot
+            neigh_idx.append(np.arange(start_idx, end_idx))
+
+        return neigh_idx
+
+    def get_popular_grains(self, n):
+        """
+        Return the grain IDs of those grains with more than `n` neighbours.
+
+        Parameters
+        ----------
+        n : int
+            Number of neighbours to check for.
+
+        Returns
+        -------
+        list of int
+            Grain IDs of those grains with more than `n` neighbours.
+
+        """
+
+        out = []
+        for i_idx, i in enumerate(self.neighbours):
+            if len(i) > n:
+                out.append(i_idx)
+
+        return out
+
+    def get_grain_mesh(self, grain_id):
+        """
+        Get the vertices and the vertex indices which form a mesh around a 
+        grain.
+
+        Parameters
+        ----------
+        grain_id : int
+
+        Returns
+        -------
+        vert : ndarray of float of shape (3, N)
+        mesh : ndarray of int of shape (3, M)
+        cent : ndarray of float of shape (3, P)
+
+        """
+
+        face_labels_i = self.get_grain_face_labels(grain_id)
+        face_tri_i = self.shared_tri[face_labels_i]
+        face_centroids_i = self.face_centroids[face_labels_i]
+
+        uniq_tri, uniq_tri_inv = np.unique(face_tri_i, return_inverse=True)
+
+        mesh = uniq_tri_inv.reshape(face_tri_i.shape)
+        vert = self.shared_vert[uniq_tri]
+
+        return vert.T, mesh.T, face_centroids_i.T
+
+    def get_grain_vertices(self, grain_id):
+
+        face_labels_i = self.get_grain_face_labels(grain_id)
+        face_tri_i = self.shared_tri[face_labels_i]
+        face_vertex_i = self.shared_vert[np.unique(face_tri_i)]
+
+        return face_vertex_i
+
+    def get_grain_face_labels(self, grain_id):
+
+        face_labels = self.face_labels
+        face_labels_i = np.where(np.any(face_labels == grain_id, axis=1))[0]
+        return face_labels_i
+
+    def get_gb_mesh(self, grain_ids):
+
+        face_labels_i = self.get_gb_face_labels(grain_ids)
+        face_centroids_i = self.face_centroids[face_labels_i]
+
+        ijk = self.shared_tri[face_labels_i]
+        ui, uir = np.unique(ijk, return_inverse=True)
+        ijk_new = uir.reshape(ijk.shape)
+        xyz_new = self.shared_vert[ui]
+
+        return xyz_new, ijk_new, face_centroids_i
+
+    def get_gb_face_labels(self, grain_ids):
+
+        return np.where(np.all(self.face_labels == grain_ids, axis=1))[0]
+
+    def get_grains(self, num_neighbours=None, num_elements=None):
+        """
+        Get the grain IDs of grains with particular properties.
+
+        Parameters
+        ----------
+        num_neighbours : int, optional
+            Return grains with a minimum number of neighbours.abs
+        num_elements : int, optional
+            Return grains with a minimum number of elements (pixels/voxels).        
+
+        Returns
+        -------
+        list of int
+            Grain IDs.
+
+        """
+
+    def isolate_mesh_region(self, grain_id, region):
+        """
+        Isolate the mesh of a given grain according to a region.
+
+        Parameters
+        ----------
+        grain_id : int
+            The grain ID of the mesh to isolate
+        region : dict
+            Parameterises a region in space (as a parallelepiped) over which to
+            isolate the mesh. A dict with keys:
+                edges : ndarray of shape (3, 3)
+                    Array of column vectors representing the edge vectors of
+                    the parallelopiped.
+                origin : ndarray of shape (3, 1)
+                    Column vector representing the origin of the 
+                    parallelepiped.
+                rotations : list of tuple
+                    List of (rotation axis index, angle in degrees), where the
+                    rotation axis index is 0, 1 or 2 and represents the axis
+                    of the parallelepiped about which to (intrinsically) 
+                    rotate the parallelepiped by the given angle. The reason
+                    a list is used is to allow fine tuning of the region.
+        """
+
+        def rotate_box(box, ax_idx, ang):
+            """Rotate the box about one of its vectors"""
+
+            r = rotations.ax_ang2rot_mat(box[:, ax_idx], ang, degrees=True)[0]
+            box = r @ box
+
+            return box
+
+        def in_box(points, box, box_origin):
+
+            points = points - box_origin
+            points_frac = np.linalg.inv(box) @ points
+            in_idx_all = np.logical_and(points_frac <= 1, points_frac > 0)
+            in_idx = np.where(np.all(in_idx_all, axis=0))[0]
+
+            return in_idx
+
+        def get_points_in_box(points, box, box_origin):
+
+            in_idx = in_box(points, box, box_origin)
+            out_idx = np.setdiff1d(np.arange(points.shape[1]), in_idx)
+            points_in = points[:, in_idx]
+            points_out = points[:, out_idx]
+
+            return points_in, in_idx, points_out, out_idx
+
+        vert, mesh, cent = self.get_grain_mesh(grain_id)
+
+        box = region['edges']
+        box_org = region['origin']
+        for box_rots in region['rotations']:
+            box = rotate_box(box, *box_rots)
+
+        vin, vin_idx, vout, vout_idx = get_points_in_box(vert, box, box_org)
+        cin, cin_idx, cout, cout_idx = get_points_in_box(cent, box, box_org)
+
+        # Reduce the mesh to only that with vertices within the box
+        mesh_flat = mesh.reshape(-1)
+
+        # Get mesh (triangles) which index vertices outside the box
+        mesh_is_out = np.in1d(mesh_flat, vout_idx).reshape(mesh.shape)
+        mesh_out_idx = np.where(np.any(mesh_is_out, axis=0))[0]
+        mesh_in_idx = np.setdiff1d(np.arange(mesh.shape[1]), mesh_out_idx)
+        mesh_in = mesh[:, mesh_in_idx]
+
+        mesh_uniq, mesh_uniq_inv = np.unique(mesh_in, return_inverse=True)
+        mesh_in_tri = mesh_uniq_inv.reshape(mesh_in.shape)
+        vert_in_tri = vert[:, mesh_uniq]
+
+        ret = Mesh(vert_in_tri, mesh_in_tri, cin)
+        return ret
+
+    def visualise_grains(self, grain_ids, cols=None, opacities=None,
+                         do_iplot=False, show_grid=True):
+        """        
+        """
+
+        traces = []
+        for gid_idx, gid in enumerate(grain_ids):
+
+            # Get vertices associated with this grain
+            vert, mesh, cen = self.get_grain_mesh(gid)
+
+            mesh_trace = {
+                'type': 'mesh3d',
+                'x': vert[0],
+                'y': vert[1],
+                'z': vert[2],
+                'i': mesh[0],
+                'j': mesh[1],
+                'k': mesh[2],
+                'opacity': 1,
+                'name': 'Grain ID: {}'.format(gid)
+            }
+
+            if cols is not None:
+                mesh_trace.update({
+                    'color': cols[gid_idx]
+                })
+
+            if opacities is not None:
+                mesh_trace.update({
+                    'opacity': opacities[gid_idx]
+                })
+
+            traces.append(mesh_trace)
+
+        layout = {
+            'scene': {
+                'aspectmode': 'data'
+            },
+            'height': 800,
+            'width': 800,
+            'showlegend': True,
+        }
+
+        if not show_grid:
+
+            hide_ax_props = dict(
+                showgrid=False,
+                zeroline=False,
+                showline=False,
+                showticklabels=False,
+                title='',
+            )
+
+            layout['scene'].update({
+                'aspectmode': 'data',
+                'xaxis': {
+                    **hide_ax_props,
+                },
+                'yaxis': {
+                    **hide_ax_props,
+                },
+                'zaxis': {
+                    **hide_ax_props,
+                },
+            })
+
+        fig = go.Figure(data=traces, layout=layout)
+
+        if do_iplot:
+            init_notebook_mode()
+            iplot(fig)
+
+        return fig
