@@ -1,4 +1,5 @@
 import numpy as np
+from itertools import permutations, combinations
 
 
 def cart2spherical(xyz):
@@ -83,6 +84,7 @@ def angle_0_to_pi(angles):
 
     return angles
 
+
 def wrap_angles(angles, min_ang, max_ang, degrees=True):
     """
     Wrap angles between min_ang and max_ang.
@@ -113,6 +115,7 @@ def wrap_angles(angles, min_ang, max_ang, degrees=True):
         return angles
     else:
         raise ValueError('Radians option not implemented.')
+
 
 def polar2cart_2D(r, θ):
     """
@@ -289,74 +292,176 @@ def get_box_xyz(box, origin=None, faces=False):
     return xyz
 
 
-def find_unique_int_vecs(s):
+def find_positive_int_vecs(search_size, dim=3):
     """
-    Find non-collinear integer vectors within an origin-centered cube of given
-    size.
+    Find arbitrary-dimension positive integer vectors which are
+    non-collinear whose components are less than or equal to a
+    given search size. Vectors with zero components are not included.
 
+    Non-collinear here means no two vectors are related by a scaling factor.
+
+    Parameters
+    ----------
+    search_size : int
+        Positive integer which is the maximum vector component
+    dim : int
+        Dimension of vectors to search.
+
+    Returns
+    -------
+    ndarray of shape (N, `dim`)
+
+    """
+
+    # Generate trial vectors as a grid of integer vectors
+    search_ints = np.arange(1, search_size + 1)
+    search_grid = np.meshgrid(*(search_ints,) * dim)
+    trials = np.vstack(search_grid).reshape((dim, -1)).T
+
+    # Multiply each trial vector by each possible integer up to
+    # `search_size`:
+    search_ints_rs = search_ints.reshape(-1, 1, 1)
+    trial_combs = trials * search_ints_rs
+
+    # Combine trial vectors and their associated scaled vectors:
+    trial_combs_all = np.vstack(trial_combs)
+
+    # Find unique vectors. The inverse indices`uinv` indexes
+    # the set of unique vectors`u` to generate the original array `pv`:
+    uniq, uniq_inv = np.unique(trial_combs_all, axis=0, return_inverse=True)
+
+    # For a given set of (anti-)parallel vectors, we want the smallest, so get
+    # their relative magnitudes. This is neccessary since `np.unique` does not
+    # return vectors sorted in a sensible way if there are negative components.
+    # (But we do we have negative components here?)
+    uniq_mag = np.sum(uniq**2, axis=1)
+
+    # Get the magnitudes of just the directionally-unique vectors:
+    uniq_inv_mag = uniq_mag[uniq_inv]
+
+    # Reshape the magnitudes to allow sorting for a given scale factor:
+    uniq_inv_mag_rs = np.reshape(uniq_inv_mag, (search_size, -1))
+
+    # Get the indices which sort the trial vectors
+    mag_srt_idx = np.argsort(uniq_inv_mag_rs, axis=0)
+
+    # Reshape the inverse indices
+    uniq_inv_rs = np.reshape(uniq_inv, (search_size, -1))
+
+    # Sort the inverse indices by their corresponding vector magnitudes,
+    # for each scale factor:
+    col_idx = np.tile(np.arange(uniq_inv_rs.shape[1]), (search_size, 1))
+    uniq_inv_rs_srt = uniq_inv_rs[mag_srt_idx, col_idx]
+
+    # Only keep inverse indices in first row which are not in any other row.
+    # First row indexes lowest magnitude vectors for each scale factor.
+    idx = np.setdiff1d(uniq_inv_rs_srt[0], uniq_inv_rs_srt[1:])
+
+    # Sort kept vectors by magnitude
+    final_mags = uniq_mag[idx]
+    final_mags_idx = np.argsort(final_mags)
+
+    ret = uniq[idx][final_mags_idx]
+
+    return ret
+
+
+def tile_int_vecs(int_vecs, dim):
+    """
+    Tile arbitrary-dimension integer vectors such that they occupy a
+    half-space.
+
+    """
+    # For tiling, there will a total of 2^(`dim` - 1) permutations of the
+    # original vector set. (`dim` - 1) since we want to fill a half space.
+    i = np.ones(dim - 1, dtype=int)
+    t = np.triu(i, k=1) + -1 * np.tril(i)
+
+    # Get permutation of +/- 1 factors to tile initial vectors into half-space
+    perms_partial_all = [j for i in t for j in list(permutations(i))]
+    perms_partial = np.array(list(set(perms_partial_all)))
+
+    perms_first_col = np.ones((2**(dim - 1) - 1, 1), dtype=int)
+    perms_first_row = np.ones((1, dim), dtype=int)
+    perms_non_eye = np.hstack([perms_first_col, perms_partial])
+    perms = np.vstack([perms_first_row, perms_non_eye])
+
+    perms_rs = perms[:, np.newaxis]
+    tiled = int_vecs * perms_rs
+    ret = np.vstack(tiled)
+
+    return ret
+
+
+def find_non_parallel_int_vecs(search_size, dim=3, tile=False):
+    """
+    Find arbitrary-dimension integer vectors which are non-collinear, whose
+    components are less than or equal to a given search size.
+
+    Non-collinear here means no two vectors are related by a scaling factor.
     The zero vector is excluded.
 
     Parameters
     ----------
-    s : int
-        Size of half the cube edge, such that vectors have maximum component
-        |s|.
+    search_size : int
+        Positive integer which is the maximum vector component.
+    dim : int
+        Dimension of vectors to search.
+    tile : bool, optional
+        If True, the half-space of dimension `dim` is filled with vectors,
+        otherwise just the positive vector components are considered. The
+        resulting vector set will still contain only non-collinear vectors.
 
     Returns
     -------
-    ndarray
-        Array of row vectors.
+    ndarray of shape (N, `dim`)
+        Vectors are not globally ordered.
 
-    Examples
-    --------
-    >>> find_unique_int_vecs(1)
-    [[ 0  0  1]
-     [ 0  1  0]
-     [ 0  1  1]
-     [ 0  1 -1]
-     [ 1 -1  0]
-     [ 1 -1  1]
-     [ 1 -1 -1]
-     [ 1  0  0]
-     [ 1  0  1]
-     [ 1  0 -1]
-     [ 1  1  0]
-     [ 1  1  1]
-     [ 1  1 -1]]
+    Notes
+    -----
+    Searching for vectors with `search_size` of 100 uses about 9 GB of memory.
 
     """
 
-    s_i = np.zeros((2 * s) + 1, dtype=int)
-    s_i[1::2] = np.arange(1, s + 1)
-    s_i[2::2] = -np.arange(1, s + 1)
+    # Find all non-parallel positive integer vectors which have no
+    # zero components:
+    ret = find_positive_int_vecs(search_size, dim)
 
-    a = np.vstack(np.meshgrid(s_i, s_i, s_i)).reshape((3, -1)).T
-    a[:, [0, 1]] = a[:, [1, 0]]
+    # If requested, tile the vectors such that they occupy a half-space:
+    if tile and dim > 1:
+        ret = tile_int_vecs(ret, dim)
 
-    # Remove the zero vector
-    a = a[1:]
+    # Add in the vectors which are contained within a subspace of dimension
+    # (`dim` - 1) on the principle axes. I.e. vectors with zero components:
+    if dim > 1:
 
-    # Use cross product to find which vectors are collinear
-    c = np.cross(a, a[:, np.newaxis])
-    w = np.where(np.all(c == 0, axis=-1).T)
+        # Recurse through each (`dim` - 1) dimension subspace:
+        low_dim = dim - 1
+        vecs_lower = find_non_parallel_int_vecs(search_size, low_dim, tile)
 
-    all_remove_idx = []
+        # Raise vectors to current dimension with a zero component. The first
+        # (`dim` - 1) "prinicple" vectors (of the form [1, 0, ...]) should be
+        # considered separately, else they will be repeated.
+        principle = np.eye(dim, dtype=int)
+        non_prcp = vecs_lower[low_dim:]
 
-    # Get the indices of collinear vectors
-    for i in set(w[0]):
+        if non_prcp.size:
 
-        col_idx = np.where(w[0] == i)[0]
+            edges_shape = (dim, non_prcp.shape[0], non_prcp.shape[1] + 1)
+            vecs_edges = np.zeros(edges_shape, dtype=int)
+            edges_idx = list(combinations(list(range(dim)), low_dim))
 
-        if len(col_idx) != 1:
-            all_remove_idx.extend(w[1][col_idx[1:]])
+            for i in range(dim):
+                vecs_edges[i][:, edges_idx[i]] = non_prcp
 
-    all_remove_idx = list(set(all_remove_idx))
+            vecs_edges = np.vstack([principle, *vecs_edges])
 
-    # Remove collinear vectors
-    a = np.delete(a, all_remove_idx, axis=0)
-    a = a[np.lexsort((a[:, 1], a[:, 0]))]
+        else:
+            vecs_edges = principle
 
-    return a
+        ret = np.vstack([vecs_edges, ret])
+
+    return ret
 
 
 def norm_vec(vec):
@@ -373,19 +478,36 @@ def norm_vec(vec):
 def point_in_poly(poly_vert, points):
     """
     Check if points lie in or out of a polygon.
-    
+
     Parameters
     ----------
     poly_vert : ndarray or list
         Vertices of polygon.
     points: ndarray of shape (N, 2)
         Points coordinates.
-    
+
     Returns
     -------
     bool of shape (N, 1)
-    
+
     """
     path = mpltPath.Path(poly_vert)
-    
+
     return path.contains_points(points)
+
+
+def get_xy_bounding_trace(x, y):
+
+    x_min, x_max = np.min(x), np.max(x)
+    y_min, y_max = np.min(y), np.max(y)
+
+    # Corners of bounding quad:
+    trace = np.array([
+        [x_min, y_min],
+        [x_max, y_min],
+        [x_max, y_max],
+        [x_min, y_max],
+        [x_min, y_min],
+    ]).T
+
+    return trace
