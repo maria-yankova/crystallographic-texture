@@ -449,53 +449,109 @@ def plane_from_normal(hkl_norm, latt_sys=None, latt_params=None, degrees=False, 
     return hkl_plane
 
 
-def cart2miller(vec, lat, tol, max_iter=10):
+def cart2miller(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
+                degrees_out=False):
+
+    all_mill, all_ang = cart2miller_all(
+        vec, lat, tol, vec_type, max_mill, degrees_in, degrees_out)
+
+    return all_mill[:, 0], all_ang[0]
+
+
+def cart2miller_all(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
+                    degrees_out=False):
     """
-    Convert a Cartesian vector into Miller indices within a particular lattice.
+    Convert a Cartesian vector into Miller indices representing a lattice 
+    direction or plane within a particular lattice system.
 
     Parameters
     ----------
-    vec : ndarray of shape (3, 1)
+    vec : ndarray of shape (3, 1) 
         Cartesian vector whose direction in Miller indices is to be found.
     lat : ndarray of shape (3, 3)
-        Column vectors representing the lattice unit cell
+        Column vectors representing the lattice unit cell 
     tol : float
         Snapping angular tolerance in degrees.
-    max_iter : int, optional
-        Maximum number of search size increments. By default, set to 10.
+    vec_type : str ("direction" | "plane-normal")
+        If "plane", `vec` is interpreted as a normal vector to the plane to be 
+        found in Miller indices.
+    max_mill: int, optional
+        Maximum Miller index. By default, set to 20.
+    degrees_in : bool, optional
+        If True, the angular tolerance will be interpreted as degrees,
+        otherwise radians. False by default.
+    degrees_out : bool, optional
+        If True, the angular differences will be returned in degrees, otherwise
+        in radians. False by default.
 
     Returns 
     -------
-    ndarray of shape (3, 1)
+    tuple of (ndarray of shape (3, N), ndarray of shape (N,))
+        The first array is an array of column vectors representing Miller 
+        indices within the specified tolerance. The second array is the
+        corresponding angular difference between a given found Miller vector
+        and the specified vector. Both arrays are sorted by smallest angle.
 
     """
 
-    tol_dist = np.tan(np.radians(tol))
+    if tol >= 90:
+        raise ValueError('Specify an angular tolerance lower than 90 degrees.')
+
+    elif tol >= 20:
+        warnings.warn('Large angular tolerance specified: {}'.format(tol))
+
+    if vec_type not in ['direction', 'plane-normal']:
+        raise ValueError('`vec_type` must be one of "direction", "plane".')
+
+    if degrees_in:
+        tol = np.deg2rad(tol)
+
+    tol_dist = 2 * np.sin(tol / 2)
 
     vec_unit = vec / np.linalg.norm(vec, axis=0)
 
-    if (vec_unit[0, 0] < 0 or
-            np.isclose(vec_unit[0, 0], 0) and vec_unit[1, 0] < 0):
-        vec_unit *= -1
+    # Transform vector to a lattice basis and check if in search space.
+    # Search space is the lattice half-space with positive a-component.
+    vec_lat = np.dot(np.linalg.inv(lat), vec_unit)
+    # print('vec_lat = ', vec_lat)
 
-    mill = None
-    min_diff = tol_dist + 1
-    search_size = 1
-    count = 0
-    while min_diff > tol_dist:
-        vecs_lat = coordgeometry.find_unique_int_vecs(search_size).T
-        vecs_std = np.dot(lat, vecs_lat)
-        vecs_std_unit = vecs_std / np.linalg.norm(vecs_std, axis=0)
+    if (vec_lat[0, 0] < 0 or
+            np.isclose(vec_lat[0, 0], 0) and vec_lat[1, 0] < 0):
+        vec_lat *= -1
+        vec_unit = np.dot(lat, vec_lat)
 
-        diff = vecs_std_unit - vec_unit
-        diff_mag = np.linalg.norm(diff, axis=0)
-        min_diff_idx = np.argmin(diff_mag)
-        min_diff = diff_mag[min_diff_idx]
-        mill = vecs_lat[:, min_diff_idx]
-        search_size += 1
-        count += 1
-        if count > max_iter:
-            raise ValueError(
-                'Could not find Miller indices in {} iterations.'.format(max_iter))
+    trials_lat = coordgeometry.find_non_parallel_int_vecs(
+        max_mill, tile=True).T
 
-    return mill
+    if vec_type == 'direction':
+        trials_cart = lat @ trials_lat
+        trials_cart_unit = trials_cart / np.linalg.norm(trials_cart, axis=0)
+
+    elif vec_type == 'plane-normal':
+        trials_cart_unit = plane_normal(
+            trials_lat, latt_vecs=lat, normed=True)
+
+    diff = trials_cart_unit - vec_unit
+    diff_mag = np.linalg.norm(diff, axis=0)
+
+    # Get indices of trial lattice vectors which are within tolerance
+    good_diff_idx = np.where(diff_mag < tol_dist)[0]
+
+    # Get lattice vectors within tolerance
+    good_mill = trials_lat[:, good_diff_idx]
+
+    if good_mill.shape[1] == 0:
+        raise ValueError(
+            'Could not find Miller indices within specified angular tolerance.')
+
+    # Find the angles of lattice vectors within tolerance
+    good_angs = 2 * np.arcsin(diff_mag[good_diff_idx] / 2)
+    if degrees_out:
+        good_angs = np.rad2deg(good_angs)
+
+    # Order good lattice vetors by difference magnitude
+    srt_idx = np.argsort(good_angs)
+    good_mill_srt = good_mill[:, srt_idx]
+    good_angs_srt = good_angs[srt_idx]
+
+    return (good_mill_srt, good_angs_srt)
