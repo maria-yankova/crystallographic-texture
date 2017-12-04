@@ -154,7 +154,7 @@ def rotmat2axang(rot_mat, degrees=False):
 
     """
 
-    tol = 1e-10
+    tol = 1e-7
 
     # Check dimensions
     if rot_mat.ndim == 3:
