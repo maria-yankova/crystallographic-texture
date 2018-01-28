@@ -1,5 +1,6 @@
 import numpy as np
-import coordgeometry
+
+from crystex import coordgeometry
 
 
 def ax_ang2rot_mat(axes, angles, degrees=False):

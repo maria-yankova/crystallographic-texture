@@ -1,6 +1,7 @@
 import numpy as np
-import numutils as nu
-import coordgeometry
+
+from crystex import numutils as nu
+from crystex import coordgeometry
 
 
 def lattice_params_from_vecs(latt_vecs):

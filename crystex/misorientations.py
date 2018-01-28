@@ -1,9 +1,10 @@
-import coordgeometry
-import lattice
-import projections
 import numpy as np
-import rotations
-from symmetry import SYM_OPS
+
+from crystex import coordgeometry
+from crystex import lattice
+from crystex import projections
+from crystex import rotations
+from crystex.symmetry import SYM_OPS
 
 
 def fibre_misorientation(fibre, euler_data, lattice_system, latt_params,

@@ -1,17 +1,17 @@
 import numpy as np
-import lattice
-import projections
-import coordgeometry
-import rotations
-import numutils
 
 from matplotlib import pyplot as plt
 from matplotlib import cm
 import matplotlib.patches as mpatches
 import matplotlib.path as mpath
-
 from plotly import tools
 import plotly.graph_objs as go
+
+from crystex import lattice
+from crystex import projections
+from crystex import coordgeometry
+from crystex import rotations
+from crystex import numutils
 
 
 def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',

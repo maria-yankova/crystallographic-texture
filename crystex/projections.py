@@ -1,7 +1,8 @@
 import numpy as np
-import coordgeometry
-import rotations
-import lattice
+
+from crystex import coordgeometry
+from crystex import rotations
+from crystex import lattice
 
 
 def equal_area_proj(xyz):

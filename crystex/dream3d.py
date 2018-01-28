@@ -3,15 +3,15 @@
 import numpy as np
 import yaml
 import h5py
-from numutils import get_from_dict, index_lst
 
 from plotly.offline import plot, iplot, init_notebook_mode
 from plotly import graph_objs as go
 
-import rotations
-import numutils
-import coordgeometry
-import plots
+from crystex import rotations
+from crystex import numutils
+from crystex import coordgeometry
+from crystex import plots
+from crystex.numutils import get_from_dict, index_lst
 
 
 class Mesh(object):
