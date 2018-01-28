@@ -1,4 +1,5 @@
 import numpy as np
+from numpy import linalg as la
 
 
 def zero_prec(A, tol=1e-12):
@@ -90,3 +91,22 @@ def get_from_dict(d, address=None):
 def index_lst(lst, idx):
     """Return indexed elements of a list."""
     return [lst[i] for i in idx]
+
+
+def col_wise_dot(a, b):
+    """ Compute the dot product between columns of a and columns of b."""
+
+    return np.einsum('ij,ij->j', a, b)
+
+
+def col_wise_angles(a, b, degrees=False):
+    """ a, b are 3 x N arrays whose columns represented vectors to find the angles betweeen."""
+
+    A = la.norm(np.cross(a, b, axis=0), axis=0)
+    B = col_wise_dot(a, b)
+    angles = np.arctan2(A, B)
+
+    if degrees:
+        angles = np.rad2deg(angles)
+
+    return angles
