@@ -91,6 +91,7 @@ ENV/
 
 # Rope project settings
 .ropeproject
+.vscode
 
 # mkdocs documentation
 /site
