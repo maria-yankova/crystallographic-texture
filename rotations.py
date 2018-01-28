@@ -181,7 +181,8 @@ def rotmat2axang(rot_mat, degrees=False):
 
         if np.sum(eig_cond) != 1:
             raise ValueError(
-                'Not exactly one eigenvector with eigenvalue of 1 found.')
+                'Not exactly one eigenvector with eigenvalue of 1 found. '
+                'Eigenvalues are: {}'.format(eigval))
 
         # Set the axes to eigenvector with eigenvalue = 1
         # Determine the sign of each component using the conditions below.
