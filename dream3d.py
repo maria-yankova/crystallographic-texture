@@ -258,6 +258,7 @@ class Mesh(object):
 
 
 class Dream3d(object):
+    """Class to represent the output from a Dream.3d pipeline."""
 
     def __init__(self, opt):
 
@@ -537,8 +538,7 @@ class Dream3d(object):
 
     def visualise_grains(self, grain_ids, cols=None, opacities=None,
                          do_iplot=False, show_grid=True):
-        """        
-        """
+        """Visualise grains using Plotly."""
 
         traces = []
         for gid_idx, gid in enumerate(grain_ids):
