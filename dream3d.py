@@ -11,16 +11,18 @@ from plotly import graph_objs as go
 import rotations
 import numutils
 import coordgeometry
+import plots
 
 
 class Mesh(object):
     """Class to represent a surface/interface mesh"""
 
-    def __init__(self, vert, mesh_idx, cent):
+    def __init__(self, vert, mesh_idx, cent, region=None):
 
         self.vert = vert
         self.mesh_idx = mesh_idx
         self.cent = cent
+        self.region = region
 
         # These are assigned if `fit_plane` is invoked.
         self.mean = None
@@ -51,34 +53,53 @@ class Mesh(object):
         z = numutils.plane(x, y, *self.plane_equation)
         return z
 
-    def visualise(self, do_iplot=False, show_grid=True, show_plane=False,
-                  plane_args=None, show_normal=False, invert_normal=False,
-                  normal_args=None):
+    def visualise(self, do_iplot=False, plane_args=None, invert_normal=False,
+                  normal_args=None, mesh_args=None, plane_lims_pad=None,
+                  show=None, add_arrows=None):
 
+        allowed_show = [
+            'plane',
+            'mesh',
+            'normal',
+            'grid',
+            'region',
+        ]
+
+        if show is None:
+            show = []
+        if add_arrows is None:
+            add_arrows = []
         if plane_args is None:
             plane_args = {}
+        if mesh_args is None:
+            mesh_args = {}
         if normal_args is None:
             normal_args = {}
 
         plane_args_def = {
             'opacity': 0.8,
         }
-        normal_args_def = {}
+        mesh_args_deg = {
+            'opacity': 0.8,
+        }
+        normal_args_def = {
+            'length': 1,
+            'head_length': 2,
+            'head_radius': 2,
+            'stem_args': {
+                'width': 5,
+            }
+        }
 
         plane_args = {**plane_args_def, **plane_args}
         normal_args = {**normal_args_def, **normal_args}
 
+        for show_obj in show:
+            if show_obj not in allowed_show:
+                raise ValueError('"{}" is not an allowed `show` string, must '
+                                 'be one of: {}'.format(show_obj, allowed_show))
+
         traces = [
-            {
-                'type': 'mesh3d',
-                'x': self.vert[0],
-                'y': self.vert[1],
-                'z': self.vert[2],
-                'i': self.mesh_idx[0],
-                'j': self.mesh_idx[1],
-                'k': self.mesh_idx[2],
-                'opacity': 1,
-            },
             {
                 'type': 'scatter3d',
                 'x': self.vert[0],
@@ -103,18 +124,37 @@ class Mesh(object):
             },
         ]
 
-        if show_plane or show_normal:
+        if 'mesh' in show:
+            traces.append({
+                'type': 'mesh3d',
+                'x': self.vert[0],
+                'y': self.vert[1],
+                'z': self.vert[2],
+                'i': self.mesh_idx[0],
+                'j': self.mesh_idx[1],
+                'k': self.mesh_idx[2],
+                **mesh_args,
+            })
+
+        if 'plane' in show or 'normal' in show:
 
             if self.plane_equation is None:
                 raise ValueError('There is no plane/normal to show. Invoke '
                                  '`fit_plane` and try again.')
 
-            if show_plane:
+            if 'plane' in show:
 
                 # Get coordinates for fitted plane mesh
                 plane_xy = coordgeometry.get_xy_bounding_trace(
                     self.fit_to[0] - self.mean[0, 0],
                     self.fit_to[1] - self.mean[1, 0])
+
+                if plane_lims_pad is not None:
+                    plane_xy[0, [0, 3, 4]] -= plane_lims_pad[0]
+                    plane_xy[0, [1, 2]] += plane_lims_pad[0]
+
+                    plane_xy[1, [0, 1, 0]] -= plane_lims_pad[1]
+                    plane_xy[1, [2, 3]] += plane_lims_pad[1]
 
                 plane_z = self.get_plane_points(*plane_xy)
 
@@ -127,21 +167,42 @@ class Mesh(object):
                 }
                 traces.append(plane_trace)
 
-            if show_normal:
+            if 'normal' in show:
 
                 scale_norm = -1 if invert_normal else 1
-                normx, normy, normz = scale_norm * self.normal[:, 0]
-                meanx, meany, meanz = self.mean[:, 0]
+                norm_dir = scale_norm * self.normal[:, 0]
 
-                norm_trace = {
-                    'type': 'scatter3d',
-                    'mode': 'lines',
-                    'x': [meanx, meanx + normx],
-                    'y': [meany, meany + normy],
-                    'z': [meanz, meanz + normz],
-                    **normal_args
+                norm_arrow_args = {
+                    'dir': norm_dir,
+                    'origin': self.mean[:, 0],
+                    **normal_args,
                 }
-                traces.append(norm_trace)
+
+                norm_arrow_traces = plots.get_3d_arrow_plotly(
+                    **norm_arrow_args)
+
+                traces.extend(norm_arrow_traces)
+
+        if 'region' in show:
+
+            if self.region is None:
+                raise ValueError('No region has been assigned for this Mesh.')
+
+            region_xyz = coordgeometry.get_box_xyz(
+                self.region['edges'], origin=self.region['origin'])[0]
+
+            region_trace = {
+                'type': 'scatter3d',
+                'mode': 'lines',
+                'x': region_xyz[0],
+                'y': region_xyz[1],
+                'z': region_xyz[2],
+                'line': {
+                    'color': 'black',
+                },
+                'name': 'Region',
+            }
+            traces.append(region_trace)
 
         layout = {
             'scene': {
@@ -152,7 +213,19 @@ class Mesh(object):
             'showlegend': True,
         }
 
-        if not show_grid:
+        for arrow_spec in add_arrows:
+
+            add_arrow_args = {
+                **arrow_spec,
+                'origin': self.mean[:, 0],
+            }
+
+            add_arrow_traces = plots.get_3d_arrow_plotly(
+                **add_arrow_args)
+
+            traces.extend(add_arrow_traces)
+
+        if 'grid' not in show:
 
             hide_ax_props = dict(
                 showgrid=False,
@@ -364,7 +437,7 @@ class Dream3d(object):
 
         return np.where(np.all(self.face_labels == grain_ids, axis=1))[0]
 
-    def get_grains(self, num_neighbours=None, num_elements=None):
+    def get_grains(self, min_neighbours=None, min_elements=None):
         """
         Get the grain IDs of grains with particular properties.
 
@@ -381,6 +454,7 @@ class Dream3d(object):
             Grain IDs.
 
         """
+        raise NotImplementedError('Too lazy.')
 
     def isolate_mesh_region(self, grain_id, region):
         """
@@ -440,6 +514,8 @@ class Dream3d(object):
         for box_rots in region['rotations']:
             box = rotate_box(box, *box_rots)
 
+        region['edges'] = box
+
         vin, vin_idx, vout, vout_idx = get_points_in_box(vert, box, box_org)
         cin, cin_idx, cout, cout_idx = get_points_in_box(cent, box, box_org)
 
@@ -456,7 +532,7 @@ class Dream3d(object):
         mesh_in_tri = mesh_uniq_inv.reshape(mesh_in.shape)
         vert_in_tri = vert[:, mesh_uniq]
 
-        ret = Mesh(vert_in_tri, mesh_in_tri, cin)
+        ret = Mesh(vert_in_tri, mesh_in_tri, cin, region=region)
         return ret
 
     def visualise_grains(self, grain_ids, cols=None, opacities=None,
@@ -498,8 +574,8 @@ class Dream3d(object):
             'scene': {
                 'aspectmode': 'data'
             },
-            'height': 800,
-            'width': 800,
+            'height': 1100,
+            'width': 1100,
             'showlegend': True,
         }
 
