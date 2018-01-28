@@ -105,8 +105,13 @@ def euler_pair_disorientation(eulers_A, eulers_B, point_group,
 
     Returns
     -------
-    tuple of ndarray (axis, angle)
-        axis : ndarray of shape (3, 1)
+    tuple of ndarray (axis_crystal, axis_sample, angle)
+        axis_crystal : ndarray of shape (3, 1)
+            Column vector representing disorientation axis within a local
+            crystal Cartesian basis.
+        axis_sample : ndarray of shape (3, 1)
+            Column vector representing disorientation axes within a sample
+            Cartesian basis.
         angle : float
             Disorientation angle in radians or degrees.
 
@@ -117,10 +122,10 @@ def euler_pair_disorientation(eulers_A, eulers_B, point_group,
 
     """
 
-    ax, ang = euler_pair_disorientation_all(eulers_A, eulers_B, point_group,
-                                            degrees_in, degrees_out)
+    ax_crys, ax_samp, ang = euler_pair_disorientation_all(
+        eulers_A, eulers_B, point_group, degrees_in, degrees_out)
 
-    return (ax[:, 0][:, np.newaxis], ang)
+    return (ax_crys[:, 0:1], ax_samp[:, 0:1], ang)
 
 
 def euler_pair_disorientation_all(eulers_A, eulers_B, point_group,
@@ -149,10 +154,13 @@ def euler_pair_disorientation_all(eulers_A, eulers_B, point_group,
 
     Returns
     -------
-    tuple of ndarray (axis, angle)
-        axis : ndarray of shape (3, N)
+    tuple of ndarray (axis_crystal, axis_sample, angle)
+        axis_crystal : ndarray of shape (3, N)
             Column vectors representing symmetrically-equivalent disorientation
-            axes.
+            axes within a local crystal Cartesian basis.
+        axis_sample : ndarray of shape (3, N)
+            Column vectors representing symmetrically-equivalent disorientation
+            axes within a sample Cartesian basis.
         angle : float
             Disorientation angle in radians or degrees.
 
@@ -167,10 +175,17 @@ def euler_pair_disorientation_all(eulers_A, eulers_B, point_group,
     rot_A = rotations.euler2rot_mat_n(eulers_A, degrees=degrees_in)[0]
     rot_B = rotations.euler2rot_mat_n(eulers_B, degrees=degrees_in)[0]
 
-    mis_rot = np.ones((len(sym_ops)**2, 3, 3)) * np.nan
-    mis_ax = np.ones((len(sym_ops)**2, 3)) * np.nan
-    mis_ang = np.ones((len(sym_ops)**2)) * np.nan
+    # print(rotations.rotmat2axang(rot_A, degrees=True))
+    # print(rotations.rotmat2axang(rot_B, degrees=True))
 
+    num_ops = len(sym_ops)**2
+    mis_rot = np.ones((num_ops, 3, 3)) * np.nan
+    mis_ax_crys = np.ones((3, num_ops)) * np.nan
+    mis_ax_samp = np.ones((3, num_ops)) * np.nan
+    mis_ang = np.ones((num_ops,)) * np.nan
+
+    all_sidx = [(i, j) for i in range(len(sym_ops))
+                for j in range(len(sym_ops))]
     s_idx = 0
 
     for sym_A in sym_ops:
@@ -184,7 +199,8 @@ def euler_pair_disorientation_all(eulers_A, eulers_B, point_group,
             ax_i, ang_i = rotations.rotmat2axang(r_i)
 
             mis_rot[s_idx] = r_i
-            mis_ax[s_idx] = ax_i
+            mis_ax_crys[:, s_idx] = ax_i
+            mis_ax_samp[:, s_idx] = inv_rot_A_sym @ ax_i
             mis_ang[s_idx] = ang_i
 
             s_idx += 1
@@ -192,13 +208,16 @@ def euler_pair_disorientation_all(eulers_A, eulers_B, point_group,
     if degrees_out:
         mis_ang = np.rad2deg(mis_ang)
 
-    dis_idx = np.where(np.isclose(mis_ang, np.min(mis_ang)))
+    dis_idx = np.where(np.isclose(mis_ang, np.min(mis_ang)))[0]
 
     dis_rot = mis_rot[dis_idx]
-    dis_ax = mis_ax[dis_idx]
+    dis_ax_crys = mis_ax_crys[:, dis_idx]
+    dis_ax_samp = mis_ax_samp[:, dis_idx]
     dis_ang = mis_ang[dis_idx]
+    dis_all_sym_idx = [i for i_idx, i in enumerate(
+        all_sidx) if i_idx in dis_idx]
 
-    return (dis_ax.T, dis_ang[0])
+    return (dis_ax_crys, dis_ax_samp, dis_ang[0], dis_all_sym_idx)
 
 
 def gb_disorientation(eulers_A, eulers_B, point_group, lat, ang_tol,
@@ -249,27 +268,56 @@ def gb_disorientation(eulers_A, eulers_B, point_group, lat, ang_tol,
     """
 
     # Find the angle and disorientation axis in Cartesian coordinates
-    ax_cart, ang = euler_pair_disorientation_all(
+    ax_cart_crys, ax_cart_samp, ang, sym_idx = euler_pair_disorientation_all(
         eulers_A, eulers_B, point_group, degrees_in, degrees_out)
 
     # print('ax_cart: \n{}\n'.format(ax_cart))
 
     ax_mill_all = []
     ax_diff_all = []
+    ax_cart_crys_all = []
+    ax_cart_samp_all = []
+    sym_idx_all = []
 
-    for ax in ax_cart.T:
+    for ax_idx in range(ax_cart_crys.shape[1]):
+
         # "Snap" the axis to the nearest lattice site within some angular tolerance
+        i = ax_cart_crys[:, ax_idx:ax_idx + 1]
+        j = ax_cart_samp[:, ax_idx:ax_idx + 1]
+        k = sym_idx[ax_idx]
+
         ax_mill, ax_diff = lattice.cart2miller_all(
-            ax[:, np.newaxis], lat, ang_tol, 'direction', max_mill, degrees_in, degrees_out)
+            i, lat, ang_tol, 'direction', max_mill, degrees_in, degrees_out)
+
+        ax_cart_crys_all.append(np.tile(i, (1, ax_mill.shape[1])))
+        ax_cart_samp_all.append(np.tile(j, (1, ax_mill.shape[1])))
+        sym_idx_all.append(np.tile(k, (ax_mill.shape[1], 1)))
 
         ax_mill_all.append(ax_mill)
         ax_diff_all.append(ax_diff)
 
     ax_mill_all = np.hstack(ax_mill_all)
     ax_diff_all = np.hstack(ax_diff_all)
+    ax_cart_crys_all = np.hstack(ax_cart_crys_all)
+    ax_cart_samp_all = np.hstack(ax_cart_samp_all)
+    sym_idx_all = np.vstack(sym_idx_all)
 
     sort_idx = np.argsort(ax_diff_all)
     ax_mill_all = ax_mill_all[:, sort_idx]
     ax_diff_all = ax_diff_all[sort_idx]
+    ax_cart_crys_all = ax_cart_crys_all[:, sort_idx]
+    ax_cart_samp_all = ax_cart_samp_all[:, sort_idx]
+    sym_idx_all = sym_idx_all[sort_idx]
 
-    return (ax_mill_all[:, 0], ax_diff_all[0], ang)
+    sym_ops = np.array(SYM_OPS[point_group])[sym_idx_all[0]]
+
+    ret = (
+        ax_cart_crys_all[:, 0],
+        ax_cart_samp_all[:, 0],
+        ax_mill_all[:, 0],
+        ax_diff_all[0],
+        sym_ops,
+        ang,
+    )
+
+    return ret
