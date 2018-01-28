@@ -2,6 +2,8 @@ import numpy as np
 import lattice
 import projections
 import coordgeometry
+import rotations
+import numutils
 
 from matplotlib import pyplot as plt
 from matplotlib import cm
@@ -74,18 +76,18 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
                          '`axes` must be one of: {}.'.format(
                              axes, all_axes))
 
-    # Plot for a single crystal 
+    # Plot for a single crystal
     if crys == 'single':
         f, ax = plt.subplots(1, 1, subplot_kw={'polar': True}, figsize=(5, 5))
-        
-        if clrs and len(clrs)==proj_poles[0][0].shape[0]:
+
+        if clrs and len(clrs) == proj_poles[0][0].shape[0]:
             for i in range(len(clrs)):
                 ax.scatter(proj_poles[0][0][i], proj_poles[0][1][i], c=clrs[i])
         elif not clrs:
             ax.scatter(proj_poles[0][0], proj_poles[0][1])
         else:
             raise ValueError('Length of {} and columns of {} do not match. '
-                    'Please specify colours for each pole.'.format(clrs, poles))
+                             'Please specify colours for each pole.'.format(clrs, poles))
 
         ax.set_title("Stereographic projection", va='bottom')
         ax.set_rmax(1)
@@ -101,7 +103,7 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
             ax.yaxis.grid(False)
             ax.xaxis.grid(False)
 
-    # Plot for a poly crystal 
+    # Plot for a poly crystal
     elif crys == 'poly':
         n_figs = len(proj_poles)
 
@@ -111,16 +113,16 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
             poles_lbl.append(''.join([str(x) for x in poles[:, i]]))
 
         if not contour:
-            f_width = 3*n_figs
+            f_width = 3 * n_figs
             f_height = 10
             f = plt.figure(1, figsize=(f_width, f_height))
 
         else:
             # Compute histogram for projected poles data
-            xgrid, ygrid = np.mgrid[-1:1:bins*1j, -1:1:bins*1j]
+            xgrid, ygrid = np.mgrid[-1:1:bins * 1j, -1:1:bins * 1j]
             Hs = projections.bin_proj_poles(proj_poles, bins=bins)[0]
-            
-            f_width = 3*n_figs
+
+            f_width = 3 * n_figs
             f_height = 15
             f = plt.figure(1, figsize=(f_width, f_height))
             # f, axs = plt.subplots(int(contour==True), n_figs, figsize=(f_width, f_height))
@@ -138,13 +140,13 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
                 ax.set_yticklabels([])
                 ax.set_title("{" + poles_lbl[n] + "}", va='bottom')
                 # cbar = plt.colorbar(cax, ax=ax)
-        
-            
+
         # Plot scatter pole figures
         for n in range(n_figs):
-            ax = f.add_subplot(int(contour==True), n_figs, n + 1, projection='polar')
+            ax = f.add_subplot(int(contour == True), n_figs,
+                               n + 1, projection='polar')
             cax = ax.scatter(proj_poles[n][0],
-                            proj_poles[n][1], cmap=cm.hsv, s=0.005)
+                             proj_poles[n][1], cmap=cm.hsv, s=0.005)
             ax.set_rmax(1)
             ax.set_xticklabels(
                 [axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
@@ -155,6 +157,7 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
                 ax.xaxis.grid(False)
 
     return f
+
 
 def plot_lattice(lattice_sys, align='cz'):
     """
@@ -191,7 +194,7 @@ def plot_lattice(lattice_sys, align='cz'):
     box = coordgeometry.get_box_xyz(cell_ortho).T
 
     # Crystal unit vectors in Cartesian coordinates
-    pole_vecs = np.stack((np.zeros((cell_ortho.shape)), cell_ortho),axis=0)
+    pole_vecs = np.stack((np.zeros((cell_ortho.shape)), cell_ortho), axis=0)
     # Labels
     poles_lbl = []
     for i in range(cell_e.shape[1]):
@@ -203,25 +206,25 @@ def plot_lattice(lattice_sys, align='cz'):
     clrs = ['red', 'blue', 'orange']
 
     trace1 = go.Scatter3d(
-            x=box[:, 0].ravel(),
-            y=box[:, 1].ravel(),
-            z=box[:, 2].ravel(),
-            mode='lines',
-            marker=dict(color='darkgrey'),
-            legendgroup=legend_name, name=legend_name)
+        x=box[:, 0].ravel(),
+        y=box[:, 1].ravel(),
+        z=box[:, 2].ravel(),
+        mode='lines',
+        marker=dict(color='darkgrey'),
+        legendgroup=legend_name, name=legend_name)
 
-    traces=[]  
+    traces = []
     data = [trace1]
     for i in range(pole_vecs.shape[2]):
-            data.append(
-                go.Scatter3d(
-                    x=pole_vecs[:, 0, i],
-                    y=pole_vecs[:, 1, i],
-                    z=pole_vecs[:, 2, i],
-                    mode='lines',
-                    marker=dict(color=clrs[i]),
-                    legendgroup=poles_lbl[i], name=poles_lbl[i])
-            )
+        data.append(
+            go.Scatter3d(
+                x=pole_vecs[:, 0, i],
+                y=pole_vecs[:, 1, i],
+                z=pole_vecs[:, 2, i],
+                mode='lines',
+                marker=dict(color=clrs[i]),
+                legendgroup=poles_lbl[i], name=poles_lbl[i])
+        )
     camera = dict(
         up=dict(x=0, y=0, z=1),
         center=dict(x=0, y=0, z=0),
@@ -229,34 +232,35 @@ def plot_lattice(lattice_sys, align='cz'):
     )
 
     layout = go.Layout(autosize=False,
-                        width=fig_size[0],
-                        height=fig_size[1],
+                       width=fig_size[0],
+                       height=fig_size[1],
 
-                        legend=dict(traceorder='grouped', x=10, bordercolor='#FFFFFF',
-                                    borderwidth=10, xanchor='right', yanchor='top'),
-                        margin=go.Margin(l=20, r=20, b=20, t=20, pad=20),
-                        scene=dict(
-                            camera=camera,
-                            xaxis=dict(showgrid=False, zeroline=False,
-                                        showline=True,
-                                        ticks='',
-                                        showticklabels=False),
-                            yaxis=dict(showgrid=False,
-                                        zeroline=True,
-                                        showline=False,
-                                        ticks='',
-                                        showticklabels=False),
-                            zaxis=dict(showgrid=False,
-                                        zeroline=True,
-                                        showline=False,
-                                        ticks='',
-                                        showticklabels=False)
-                        ),
-                        )
+                       legend=dict(traceorder='grouped', x=10, bordercolor='#FFFFFF',
+                                   borderwidth=10, xanchor='right', yanchor='top'),
+                       margin=go.Margin(l=20, r=20, b=20, t=20, pad=20),
+                       scene=dict(
+                           camera=camera,
+                           xaxis=dict(showgrid=False, zeroline=False,
+                                      showline=True,
+                                      ticks='',
+                                      showticklabels=False),
+                           yaxis=dict(showgrid=False,
+                                      zeroline=True,
+                                      showline=False,
+                                      ticks='',
+                                      showticklabels=False),
+                           zaxis=dict(showgrid=False,
+                                      zeroline=True,
+                                      showline=False,
+                                      ticks='',
+                                      showticklabels=False)
+                       ),
+                       )
 
     f = go.Figure(data=data, layout=layout)
 
     return f
+
 
 def plot_crystal_poles(poles, lattice_sys, pole_type, clrs):
     """
@@ -265,7 +269,7 @@ def plot_crystal_poles(poles, lattice_sys, pole_type, clrs):
     TODO:
     - 
     """
-    
+
     M = lattice.crystal2ortho(lattice_sys, normed=True, degrees=True)
 
     cell_e = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]]).T
@@ -297,7 +301,7 @@ def plot_crystal_poles(poles, lattice_sys, pole_type, clrs):
             poles = lattice.miller_brav2miller(poles, idx_type='direction')
 
         d_poles = np.dot(M.T, poles)
-        pole_vecs = np.stack((np.zeros((d_poles.shape)), d_poles),axis=0)
+        pole_vecs = np.stack((np.zeros((d_poles.shape)), d_poles), axis=0)
 
         legend_name = lattice_sys + ' cell'
         fig_size = [400, 400]
@@ -391,18 +395,20 @@ def plot_mask_shape(sh_verts, out=True, ax=None):
     ylim = ax.get_ylim()
 
     # Verticies of the plot boundaries in clockwise direction
-    plot_verts = [(xlim[0], ylim[0]), (xlim[0], ylim[1]), 
-                   (xlim[1], ylim[1]), (xlim[1], ylim[0]), 
-                   (xlim[0], ylim[0])]
+    plot_verts = [(xlim[0], ylim[0]), (xlim[0], ylim[1]),
+                  (xlim[1], ylim[1]), (xlim[1], ylim[0]),
+                  (xlim[0], ylim[0])]
 
-    # Specify vertex types 
-    plot_verts_types = [mpath.Path.MOVETO] + (len(plot_verts) - 1) * [mpath.Path.LINETO]
-    sh_verts_types = [mpath.Path.MOVETO] + (len(sh_verts) - 1) * [mpath.Path.LINETO]
+    # Specify vertex types
+    plot_verts_types = [mpath.Path.MOVETO] + \
+        (len(plot_verts) - 1) * [mpath.Path.LINETO]
+    sh_verts_types = [mpath.Path.MOVETO] + \
+        (len(sh_verts) - 1) * [mpath.Path.LINETO]
 
     # Create a path and a white patch
     path = mpath.Path(plot_verts + sh_verts, plot_verts_types + sh_verts_types)
     patch = mpatches.PathPatch(path, facecolor='white', edgecolor='none')
-    
+
     addpatch = ax.add_patch(patch)
 
     # Reset to original plot limits
@@ -410,4 +416,159 @@ def plot_mask_shape(sh_verts, out=True, ax=None):
     ax.set_ylim(ylim)
 
     return addpatch
-    
+
+
+def get_3d_arrow_plotly(dir, origin, length, head_length=None,
+                        head_radius=None, stem_args=None, n_points=100,
+                        head_colour=None, opacity=None):
+    """
+    Get a list of Plotly traces which together represent a 3D arrow.
+
+    Parameters
+    ----------
+    dir : ndarray of shape (3, )
+        Direction vector along which the arrow should point.
+    origin : ndarray of shape (3, )
+        Origin for the base of the stem of the arrow.
+    length : float or int
+        Total length of the arrow from base of the stem to the tip of the arrow
+        head.
+    head_length : float or int, optional
+        Length of the arrow head from the tip to the arrow head base. Default
+        is None, in which case it will be set to 0.1 * `length`
+    head_radius : float or int, optional
+        Radius of the base of the arrow head. Default is None, in which case it
+        will be set to 0.05 * `length`.
+    stem_args : dict, optional
+        Specifies the properties of the Plotly line trace used to represent the
+        stem of the arrow. Use this to set e.g. `width` and `color`.
+    n_points : int, optional
+        Number of points to approximate the circular base of the arrow head.
+        Default is 100.
+
+    Returns
+    -------
+    list of Plotly traces
+
+    """
+
+    if head_length is None:
+        head_length = length * 0.1
+
+    if head_radius is None:
+        head_radius = length * 0.05
+
+    if stem_args is None:
+        stem_args = {}
+
+    if stem_args.get('width') is None:
+        stem_args['width'] = head_radius * 10
+
+    if stem_args.get('color') is None:
+        stem_args['color'] = 'blue'
+
+    if head_colour is None:
+        head_colour = 'blue'
+
+    sp = (2 * np.pi) / n_points
+    θ = np.linspace(0, (2 * np.pi) - sp, n_points)
+    θ_deg = np.rad2deg(θ)
+
+    if opacity is None:
+        opacity = 0.5
+
+    # First construct arrow head as pointing in the z-direction
+    # with its base on (0,0,0)
+    x = head_radius * np.cos(θ)
+    y = head_radius * np.sin(θ)
+
+    # Arrow head base:
+    x1 = np.hstack(([0], x))
+    y1 = np.hstack(([0], y))
+    z1 = np.zeros(x.shape[0] + 1)
+    ah_base = np.vstack([x1, y1, z1])
+
+    # Arrow head cone:
+    x2 = np.copy(x1)
+    y2 = np.copy(y1)
+    z2 = np.copy(z1)
+    z2[0] = head_length
+    ah_cone = np.vstack([x2, y2, z2])
+
+    # Rotate arrow head so that it points in `dir`
+    dir_unit = dir / np.linalg.norm(dir)
+    z_unit = np.array([0, 0, 1])
+
+    # print('dir_unit: \n{}\n'.format(dir_unit))
+    # print('z_unit: \n{}\n'.format(z_unit))
+    # print('origin: \n{}\n'.format(origin))
+
+    if np.allclose(z_unit, dir_unit):
+        rot_ax = np.array([1, 0, 0])
+        rot_an = 0
+
+    elif np.allclose(-z_unit, dir_unit):
+        rot_ax = np.array([1, 0, 0])
+        rot_an = np.pi
+
+    else:
+
+        rot_ax = np.cross(z_unit, dir_unit)
+        rot_an = numutils.col_wise_angles(
+            dir_unit[:, np.newaxis], z_unit[:, np.newaxis])[0]
+
+    rot_an_deg = np.rad2deg(rot_an)
+    rot_mat = rotations.ax_ang2rot_mat(rot_ax, rot_an)[0]
+
+    # Reorient arrow head and translate
+    stick_length = length - head_length
+    ah_translate = (origin + (stick_length * dir_unit))
+    ah_base_dir = np.dot(rot_mat, ah_base) + ah_translate[:, np.newaxis]
+    ah_cone_dir = np.dot(rot_mat, ah_cone) + ah_translate[:, np.newaxis]
+
+    i = np.zeros(x1.shape[0] - 1, dtype=int)
+    j = np.arange(1, x1.shape[0])
+    k = np.roll(np.arange(1, x1.shape[0]), 1)
+
+    data = [
+        {
+            'type': 'mesh3d',
+            'x': ah_base_dir[0],
+            'y': ah_base_dir[1],
+            'z': ah_base_dir[2],
+            'i': i,
+            'j': j,
+            'k': k,
+            'hoverinfo': 'none',
+            'color': head_colour,
+            'opacity': opacity,
+        },
+        {
+            'type': 'mesh3d',
+            'x': ah_cone_dir[0],
+            'y': ah_cone_dir[1],
+            'z': ah_cone_dir[2],
+            'i': i,
+            'j': j,
+            'k': k,
+            'hoverinfo': 'none',
+            'color': head_colour,
+            'opacity': opacity,
+        },
+        {
+            'type': 'scatter3d',
+            'x': [origin[0], ah_translate[0]],
+            'y': [origin[1], ah_translate[1]],
+            'z': [origin[2], ah_translate[2]],
+            'hoverinfo': 'none',
+            'mode': 'lines',
+            'line': stem_args,
+            'projection': {
+                'x': {
+                    'show': False
+                }
+            }
+        },
+    ]
+
+    return data
