@@ -3,7 +3,7 @@ import numpy as np
 from crystex import coordgeometry
 from crystex import rotations
 from crystex import lattice
-
+from crystex import symmetry
 
 def equal_area_proj(xyz):
     """
@@ -79,10 +79,10 @@ def stereographic_proj(xyz):
     return θ, R
 
 
-def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=None,
+def project_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=None,
                           pole_type=None, degrees=False, align='cz', crys=None,
                           rot_mat=None, eulers=None, axes='xyz', ret_poles=False,
-                          user_rot=None):
+                          user_rot=None, apply_sym=False):
     """
     Project a set of crystal poles specified using Miller(-Bravais) indices.
 
@@ -119,7 +119,7 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         Array of `n` rotation matrices for conversion from crystal to sample
         coordinate system. See notes.
     eulers : ndarray of shape (N, 3), optional
-        An array of Euler angles using Bunge (zx'z") convention (φ1, Φ, φ2).
+        An array of Euler angles using Bunge (zx'z") convention (φ1, Φ, φ2) in degrees.
     axes  : string
         Set alignment of sample axes with projection sphere axes. Options:
         'xyz' (default); 'yzx'; 'zxy'; 'yxz'; 'zyx'; 'xzy'.
@@ -128,6 +128,8 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
     user_rot : list 
         A rotation axis and angle in degrees defined by the user. 
         Example: [[0,1,0], 90]
+    apply_sym : bool
+        Apply symmetry (optional). Only works for hcp at the moment.
 
     Returns
     -------
@@ -164,19 +166,28 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
 
     # Check valid entry for rot_mat and eulers
     if crys == 'poly':
-        if rot_mat and eulers:
+        if rot_mat is not None and eulers is not None:
             raise ValueError(
                 'Specify either `rot_mat` or `eulers` but not both.')
         elif eulers is not None:
             rot_mat = np.linalg.inv(
                 rotations.euler2rot_mat_n(eulers, degrees=True))
         elif rot_mat is None and eulers is None:
-            raise ValueError('Please specify `rot_mat` or `eulers` corresponding to'
+            raise ValueError('Please specify `rot_mat` or `eulers` corresponding to '
                              'orientation of individual poles in polycrystal.')
     elif crys == 'single' and rot_mat:
         raise ValueError('"{}" and "{}" is not a valid set of options for `crys`'
                          ' and `rot_mat`. Specify either `crys`=\'single\' or '
                          '`crys`=\'poly\' and `rot_mat`'.format(crys, rot_mat))
+    
+    # Apply symmetry 
+    if apply_sym:
+        if lattice_sys=='hexagonal':
+            sym_ops = symmetry.SYM_OPS['6/mmm'] # 12 symmetry operators
+            rot_mat_sym = []
+            for sym in sym_ops:
+                rot_mat_sym.append(sym @ rot_mat)
+            rot_mat = np.reshape(np.array(rot_mat_sym), (len(sym_ops)*rot_mat.shape[0], 3, 3))
 
     # Check valid entry for projection type
     proj_opt = {'stereographic': stereographic_proj,
@@ -238,7 +249,7 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         M_rec = cell_rec        # Column vectors of reciprocal a,b,c
         # Reciprocal lattice vectors for poles (column vectors)
         g_poles = np.dot(cell_rec, poles)
-
+        
         if crys == 'poly':
             for g_i in range(g_poles.shape[1]):
                 pp = np.dot(rot_mat, g_poles[:, g_i]).T
@@ -256,7 +267,15 @@ def ploject_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
 
         d_poles = np.dot(M.T, poles)
 
-        proj_poles.append(project(d_poles))
+        if crys == 'poly':
+            for d_i in range(d_poles.shape[1]):
+                pp = np.dot(rot_mat, d_poles[:, d_i]).T
+                ppp = np.dot(np.squeeze(R_ax, axis=0), pp)
+                if user_rot:
+                    ppp = np.dot(np.squeeze(R_usr, axis=0), ppp)
+                proj_poles.append(project(ppp))
+        else:
+            proj_poles.append(project(d_poles))
 
     if ret_poles:
         return proj_poles, ppp
