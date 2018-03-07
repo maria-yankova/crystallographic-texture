@@ -15,7 +15,7 @@ from crystex import numutils
 
 
 def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
-                  grid=False, clrs=None, contour=False, bins=50):
+                  grid=False, clrs=None, contour=False, bins=50, title=None):
     """
     Return a figure object for a pole figure. For a single crystal, plots a single 
     pole figure for all `poles`. For a poly crystal, plots n pole figures, one 
@@ -46,6 +46,8 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
         Plot a contour plot. False by dafualt. Only available if `crys` = 'poly'.
     bins : int
         If `contour` = True, number of bins.
+    title: string
+        Plot title
 
     Returns
     -------
@@ -62,7 +64,6 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
     - Think about link between number of bins and angles.
 
     """
-
     all_crys = ['single', 'poly']
     if crys not in all_crys:
         raise ValueError('"{}" is not a valid crystal type. '
@@ -88,8 +89,8 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
         else:
             raise ValueError('Length of {} and columns of {} do not match. '
                              'Please specify colours for each pole.'.format(clrs, poles))
-
-        ax.set_title("Stereographic projection", va='bottom')
+        if title:
+            ax.set_title(title, va='bottom')
         ax.set_rmax(1)
         if lattice_sys != 'hexagonal':
             ax.set_xticklabels(['', '', '[010]', '', '', '', '', ''])
@@ -106,7 +107,6 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
     # Plot for a poly crystal
     elif crys == 'poly':
         n_figs = len(proj_poles)
-
         # get poles labels
         poles_lbl = []
         for i in range(n_figs):
@@ -131,7 +131,7 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
             # Plot contour pole figures
             for n in range(n_figs):
                 ax = f.add_subplot(2, n_figs, n + 4)
-                cax = ax.contourf(xgrid, ygrid, Hs[n], interp='none')
+                cax = ax.contourf(xgrid, ygrid, Hs[n])
                 plot_mask_shape(pts_circ)
                 ax.set_aspect(1)
                 ax.axis('Off')
@@ -143,8 +143,7 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
 
         # Plot scatter pole figures
         for n in range(n_figs):
-            ax = f.add_subplot(int(contour == True), n_figs,
-                               n + 1, projection='polar')
+            ax = f.add_subplot(int(contour == True) + 1, n_figs, n+1, projection='polar')
             cax = ax.scatter(proj_poles[n][0],
                              proj_poles[n][1], cmap=cm.hsv, s=0.005)
             ax.set_rmax(1)
