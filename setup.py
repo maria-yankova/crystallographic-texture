@@ -16,5 +16,6 @@ setup(
         'mendeleev',
         'dropbox',
         'PyYAML',
+        'scipy',
     ]
 )
