@@ -304,7 +304,7 @@ def rotate_axes(axes):
     - Add all options: ['xyz', 'yzx', 'zxy', 'yxz', 'zyx', 'xzy']
     """
     if axes == 'xyz':
-        Rtot = np.eye(3, 3)
+        Rtot = np.eye(3, 3)[np.newaxis]
 
     elif axes == 'yzx':
         R1 = ax_ang2rot_mat(np.array([0, 1, 0]), -90.0, degrees=True)
