@@ -17,5 +17,6 @@ setup(
         'dropbox',
         'PyYAML',
         'scipy',
+        'palettable'
     ]
 )
