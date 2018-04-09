@@ -42,7 +42,7 @@ def fibre_misorientation(fibre, euler_data, lattice_system, latt_params,
         Weights for each misorientation angle calculated as 1 / sin(mis_ang).
     """
 
-    cart_3dpoles = projections.ploject_crystal_poles(fibre, crys='poly', eulers=euler_data,
+    cart_3dpoles = projections.project_crystal_poles(fibre, crys='poly', eulers=euler_data,
                                                      proj_type='equal_area', lattice_sys=lattice_system,
                                                      latt_params=latt_params, pole_type='plane-normal',
                                                      degrees=True, axes=axes, ret_poles=True,
