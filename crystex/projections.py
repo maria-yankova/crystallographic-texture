@@ -79,10 +79,11 @@ def stereographic_proj(xyz):
     return θ, R
 
 
-def project_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=None,
-                          pole_type=None, degrees=False, align='cz', crys=None,
-                          rot_mat=None, eulers=None, axes='xyz', ret_poles=False,
-                          user_rot=None, apply_sym=False):
+def project_crystal_poles(poles, rot_mat=None, eulers=None, proj_type=None, 
+                            lattice_sys=None, latt_params=None,
+                            pole_type=None, degrees=False, align='cz', crys=None,
+                            axes='xyz', ret_poles=False,
+                            user_rot=None, apply_sym=False):
     """
     Project a set of crystal poles specified using Miller(-Bravais) indices.
 
@@ -91,6 +92,12 @@ def project_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
     poles : ndarray of shape (3 or 4, n)
         Array of poles given in Miller (Miller-Bravais for 'hexagonal'
         lattice system) indices as column vectors.
+    rot_mat : ndarray of shape (n,3,3)
+        Array of `n` rotation matrices for conversion from crystal to sample
+        coordinate system. See notes. Note, specify either `rot_mat` or `eulers`.
+    eulers : ndarray of shape (N, 3), optional
+        An array of Euler angles using Bunge (zx'z") convention (φ1, Φ, φ2) in degrees.
+        Note, specify either `rot_mat` or `eulers`.
     proj_type: string
         Projection type is 'stereographic' or 'equal_area'.
     lattice_sys : string, optional
@@ -109,17 +116,12 @@ def project_crystal_poles(poles, proj_type=None, lattice_sys=None, latt_params=N
         - 'ax': a-axis || x-axis and c*-axis || z*-axis
         - 'by': b-axis || y-axis and a*-axis || x*-axis
         - 'cz': c-axis || z-axis and a*-axis || x*-axis [Default]
-        where * corresponds to reciprocal lattice vectors.
+        where * refers to reciprocal lattice vectors.
     crys : string
         Specifies type of crystal: 'single' or 'poly'. For 'single' crystal,
         `proj_poles` expects the projections of pole(s) in a single crystal
         aligned with the sample coordinate system. For a 'poly' crystal,
         `proj_poles` expects the projections of a given pole in a set of crystals.
-    rot_mat : ndarray of shape (n,3,3)
-        Array of `n` rotation matrices for conversion from crystal to sample
-        coordinate system. See notes.
-    eulers : ndarray of shape (N, 3), optional
-        An array of Euler angles using Bunge (zx'z") convention (φ1, Φ, φ2) in degrees.
     axes  : string
         Set alignment of sample axes with projection sphere axes. Options:
         'xyz' (default); 'yzx'; 'zxy'; 'yxz'; 'zyx'; 'xzy'.
