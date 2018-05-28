@@ -101,3 +101,4 @@ ENV/
 
 # Custom
 dev-notebooks
+docs/algorithm.html

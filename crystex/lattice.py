@@ -459,6 +459,26 @@ def cart2miller(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
     return all_mill[:, 0], all_ang[0]
 
 
+def flip_vec_to_half_space(vec):
+    """
+    Flip vector into a positive a-component half space.
+    """
+    a = vec[0, 0]
+    b = vec[1, 0]
+    c = vec[2, 0]
+
+    flip = False
+    if (
+            (a < 0)
+            or (np.isclose(a, 0) and b < 0)
+            or (np.isclose(a, 0) and np.isclose(b, 0) and c < 0)
+    ):
+        flip = True
+
+    if flip:
+        vec *= -1
+
+
 def cart2miller_all(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
                     degrees_out=False):
     """
@@ -514,12 +534,8 @@ def cart2miller_all(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
     # Transform vector to a lattice basis and check if in search space.
     # Search space is the lattice half-space with positive a-component.
     vec_lat = np.dot(np.linalg.inv(lat), vec_unit)
-    # print('vec_lat = ', vec_lat)
-
-    if (vec_lat[0, 0] < 0 or
-            np.isclose(vec_lat[0, 0], 0) and vec_lat[1, 0] < 0):
-        vec_lat *= -1
-        vec_unit = np.dot(lat, vec_lat)
+    flip_vec_to_half_space(vec_lat)
+    vec_unit = np.dot(lat, vec_lat)
 
     trials_lat = coordgeometry.find_non_parallel_int_vecs(
         max_mill, tile=True).T
