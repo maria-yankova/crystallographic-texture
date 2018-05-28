@@ -282,16 +282,19 @@ class Dream3d(object):
         self.grain_ids = None
         self.neighbours = None
 
-        if opt.get('neigh_list') is not None:
-            all_neigh_path = cell_feat_data_path + [opt['neigh_list']]
-            self.all_neighbours = np.array(get_from_dict(d3d, all_neigh_path))
-            self.set_grain_neighbours()
-
         num_neigh_path = cell_feat_data_path + [opt['neigh_num']]
         eulers_path = cell_feat_data_path + [opt['avg_euler']]
         num_grn_elms_path = cell_feat_data_path + [opt['num_elements']]
         elm_grn_ids_path = img_data_path + \
             [opt['cell_data'], opt['cell_feat_id']]
+
+        self.element_grain_ids = np.array(get_from_dict(d3d, elm_grn_ids_path))
+        self.num_neighbours = np.array(get_from_dict(d3d, num_neigh_path))
+
+        if opt.get('neigh_list') is not None:
+            all_neigh_path = cell_feat_data_path + [opt['neigh_list']]
+            self.all_neighbours = np.array(get_from_dict(d3d, all_neigh_path))
+            self.set_grain_neighbours()
 
         self.face_labels = np.array(get_from_dict(d3d, face_labs_path))
         self.face_areas = np.array(get_from_dict(d3d, face_areas_path))
@@ -299,11 +302,9 @@ class Dream3d(object):
         self.shared_tri = np.array(get_from_dict(d3d, shared_tri_path))
         self.shared_vert = np.array(get_from_dict(d3d, shared_vert_path))
 
-        self.num_neighbours = np.array(get_from_dict(d3d, num_neigh_path))
         self.eulers = np.array(get_from_dict(d3d, eulers_path))
         self.num_grain_elements = np.array(
             get_from_dict(d3d, num_grn_elms_path)[:, 0])
-        self.element_grain_ids = np.array(get_from_dict(d3d, elm_grn_ids_path))
 
     @classmethod
     def from_file_options(cls, opt_file_path):
