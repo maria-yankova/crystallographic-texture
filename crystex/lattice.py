@@ -2,7 +2,7 @@ import numpy as np
 
 from crystex import numutils as nu
 from crystex import coordgeometry
-
+import warnings
 
 def lattice_params_from_vecs(latt_vecs):
     """
@@ -520,6 +520,7 @@ def cart2miller_all(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
 
     elif tol >= 20:
         warnings.warn('Large angular tolerance specified: {}'.format(tol))
+        pass
 
     if vec_type not in ['direction', 'plane-normal']:
         raise ValueError('`vec_type` must be one of "direction", "plane".')

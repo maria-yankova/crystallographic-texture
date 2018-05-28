@@ -15,7 +15,8 @@ from crystex import numutils
 
 
 def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
-                  grid=False, clrs=None, contour=False, bins=50, title=None):
+                  grid=False, clrs=None, contour=False, bins=50, title=None,
+                  marker_size=0.005):
     """
     Return a figure object for a pole figure. For a single crystal, plots a single 
     pole figure for all `poles`. For a poly crystal, plots n pole figures, one 
@@ -145,7 +146,7 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
         for n in range(n_figs):
             ax = f.add_subplot(int(contour == True) + 1, n_figs, n+1, projection='polar')
             cax = ax.scatter(proj_poles[n][0],
-                             proj_poles[n][1], cmap=cm.hsv, s=0.005)
+                             proj_poles[n][1], cmap=cm.hsv, s=marker_size)
             ax.set_rmax(1)
             ax.set_xticklabels(
                 [axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
