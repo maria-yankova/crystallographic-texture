@@ -19,5 +19,6 @@ setup(
         'scipy',
         'palettable',
         'scikit-image',
+        'pandas',
     ]
 )
