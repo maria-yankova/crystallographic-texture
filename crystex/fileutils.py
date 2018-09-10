@@ -14,7 +14,7 @@ def read_ctf_header(file_path, no_lines=13):
     header : dict 
 
     """
-
+   
     n_lines = 13
     with open(file_path) as myfile:
         head = [next(myfile).rstrip('\n') for x in range(n_lines)]
@@ -44,8 +44,6 @@ def read_ctf_header(file_path, no_lines=13):
                                + p.split('\t')[1].split(';')]
                 name = p.split('\t')[2]
 
-                phase_data = [name, latt_params]
-                # header['phases'].append(phase_data)
                 header['phases'].append({
                     'name': name,
                     'lattice_params': latt_params
