@@ -20,5 +20,6 @@ setup(
         'palettable',
         'scikit-image',
         'pandas',
+        'vecmaths'
     ]
 )
