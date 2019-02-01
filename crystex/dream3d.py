@@ -260,24 +260,13 @@ class Mesh(object):
 class Dream3d(object):
     """Class to represent the output from a Dream.3d pipeline."""
 
-    def __init__(self, opt):
+    def __init__(self, opt, tri_data=False):
 
         d3d = h5py.File(opt['filepath'], 'r')
 
-        tri_data_path = [opt['all_data'], opt['tri_data']]
-        img_data_path = [opt['all_data'], opt['img_data']]
-
-        face_data_path = tri_data_path + [opt['face_data']]
-        tri_geom_path = tri_data_path + [opt['tri_geom']]
-
+        img_data_path = [opt['all_data'], opt['img_data']]       
         cell_feat_data_path = img_data_path + [opt['cell_feat_data']]
-
-        face_labs_path = face_data_path + [opt['face_labels']]
-        face_areas_path = face_data_path + [opt['face_areas']]
-        face_cent_path = face_data_path + [opt['face_centroids']]
-        shared_tri_path = tri_geom_path + [opt['tri_list']]
-        shared_vert_path = tri_geom_path + [opt['vert_list']]
-
+        
         self.all_neighbours = None
         self.grain_ids = None
         self.neighbours = None
@@ -285,26 +274,39 @@ class Dream3d(object):
         num_neigh_path = cell_feat_data_path + [opt['neigh_num']]
         eulers_path = cell_feat_data_path + [opt['avg_euler']]
         num_grn_elms_path = cell_feat_data_path + [opt['num_elements']]
+        grn_phases_path = cell_feat_data_path + [opt['gr_phases']]
         elm_grn_ids_path = img_data_path + \
             [opt['cell_data'], opt['cell_feat_id']]
 
         self.element_grain_ids = np.array(get_from_dict(d3d, elm_grn_ids_path))
         self.num_neighbours = np.array(get_from_dict(d3d, num_neigh_path))
+        self.grain_phases =  np.array(get_from_dict(d3d, grn_phases_path))
 
         if opt.get('neigh_list') is not None:
             all_neigh_path = cell_feat_data_path + [opt['neigh_list']]
             self.all_neighbours = np.array(get_from_dict(d3d, all_neigh_path))
             self.set_grain_neighbours()
-
-        self.face_labels = np.array(get_from_dict(d3d, face_labs_path))
-        self.face_areas = np.array(get_from_dict(d3d, face_areas_path))
-        self.face_centroids = np.array(get_from_dict(d3d, face_cent_path))
-        self.shared_tri = np.array(get_from_dict(d3d, shared_tri_path))
-        self.shared_vert = np.array(get_from_dict(d3d, shared_vert_path))
-
         self.eulers = np.array(get_from_dict(d3d, eulers_path))
-        self.num_grain_elements = np.array(
-            get_from_dict(d3d, num_grn_elms_path)[:, 0])
+
+        if tri_data:
+            tri_data_path = [opt['all_data'], opt['tri_data']]
+            face_data_path = tri_data_path + [opt['face_data']]
+            tri_geom_path = tri_data_path + [opt['tri_geom']]
+            
+            face_labs_path = face_data_path + [opt['face_labels']]
+            face_areas_path = face_data_path + [opt['face_areas']]
+            face_cent_path = face_data_path + [opt['face_centroids']]
+            shared_tri_path = tri_geom_path + [opt['tri_list']]
+            shared_vert_path = tri_geom_path + [opt['vert_list']]
+
+            self.face_labels = np.array(get_from_dict(d3d, face_labs_path))
+            self.face_areas = np.array(get_from_dict(d3d, face_areas_path))
+            self.face_centroids = np.array(get_from_dict(d3d, face_cent_path))
+            self.shared_tri = np.array(get_from_dict(d3d, shared_tri_path))
+            self.shared_vert = np.array(get_from_dict(d3d, shared_vert_path))
+
+            self.num_grain_elements = np.array(
+                get_from_dict(d3d, num_grn_elms_path)[:, 0])
 
     @classmethod
     def from_file_options(cls, opt_file_path):
