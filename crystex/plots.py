@@ -6,6 +6,8 @@ import matplotlib.patches as mpatches
 import matplotlib.path as mpath
 from plotly import tools
 import plotly.graph_objs as go
+import matplotlib.gridspec as gridspec
+from matplotlib.colorbar import Colorbar
 
 from crystex import lattice
 from crystex import projections
@@ -16,7 +18,7 @@ from crystex import numutils
 
 def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
                   grid=False, clrs=None, contour=False, bins=50, title=None,
-                  marker_size=0.005):
+                  marker_size=0.005, clr_map=None, proj_poles_theory=None):
     """
     Return a figure object for a pole figure. For a single crystal, plots a single 
     pole figure for all `poles`. For a poly crystal, plots n pole figures, one 
@@ -49,7 +51,8 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
         If `contour` = True, number of bins.
     title: string
         Plot title
-
+    proj_poles_theory : tuple of ndarrays of shape (n,)
+        Arrays of `n` polar angles and radii as projections of the theoretical poles.
     Returns
     -------
     f : matplotlib figure
@@ -108,31 +111,42 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
     # Plot for a poly crystal
     elif crys == 'poly':
         n_figs = len(proj_poles)
+        width_ratios = np.append([1] * n_figs, 0.1)
         # get poles labels
         poles_lbl = []
         for i in range(n_figs):
             poles_lbl.append(''.join([str(x) for x in poles[:, i]]))
 
-        if not contour:
+        if not contour:          
             f_width = 3 * n_figs
             f_height = 10
             f = plt.figure(1, figsize=(f_width, f_height))
+            gs0 = gridspec.GridSpec(1, 1)
+            gs0.update(left=0.05, right=0.95, bottom=0.08, top=0.93, wspace=0.02, hspace=0.03)
+            gs00 = gridspec.GridSpecFromSubplotSpec(1, n_figs+1, subplot_spec=gs0[0], width_ratios=width_ratios)
 
         else:
             # Compute histogram for projected poles data
             xgrid, ygrid = np.mgrid[-1:1:bins * 1j, -1:1:bins * 1j]
             Hs = projections.bin_proj_poles(proj_poles, bins=bins)[0]
 
-            f_width = 3 * n_figs
-            f_height = 15
+            f_width = 4 * n_figs
+            f_height = 5
             f = plt.figure(1, figsize=(f_width, f_height))
-            # f, axs = plt.subplots(int(contour==True), n_figs, figsize=(f_width, f_height))
-            pts_circ = coordgeometry.pts_on_circle(1)
+            gs0 = gridspec.GridSpec(2, 1)
+            gs0.update(left=0.05, right=0.95, bottom=0.08, top=0.93, wspace=0.02, hspace=0.2)
+            gs00 = gridspec.GridSpecFromSubplotSpec(1, n_figs+1, subplot_spec=gs0[0], width_ratios=width_ratios)
+            gs01 = gridspec.GridSpecFromSubplotSpec(1, n_figs+1, subplot_spec=gs0[1], width_ratios=width_ratios)
+            
 
+            pts_circ = coordgeometry.pts_on_circle(1)
+            n_lev = int(bins)
+            v_max = np.max(Hs)
+            levels = np.linspace(0.0, v_max, n_lev)
             # Plot contour pole figures
             for n in range(n_figs):
-                ax = f.add_subplot(2, n_figs, n + 4)
-                cax = ax.contourf(xgrid, ygrid, Hs[n])
+                ax = f.add_subplot(gs01[n])
+                cax = ax.contourf(xgrid, ygrid, Hs[n], n_lev, antialiased=True, vmin=0.0, vmax=v_max, levels=levels)
                 plot_mask_shape(pts_circ)
                 ax.set_aspect(1)
                 ax.axis('Off')
@@ -140,18 +154,30 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
                     [axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
                 ax.set_yticklabels([])
                 ax.set_title("{" + poles_lbl[n] + "}", va='bottom')
-                # cbar = plt.colorbar(cax, ax=ax)
+            cbax = f.add_subplot(gs01[-1])
+            cb = Colorbar(ax = cbax, mappable = cax, orientation = 'vertical' )
+            cbax.tick_params(labelsize=12)
+                
 
         # Plot scatter pole figures
         for n in range(n_figs):
-            ax = f.add_subplot(int(contour == True) + 1, n_figs, n+1, projection='polar')
-            cax = ax.scatter(proj_poles[n][0],
-                             proj_poles[n][1], cmap=cm.hsv, s=marker_size)
+            ax = f.add_subplot(gs00[n], projection='polar')
+            if clr_map is not None:
+                cax = ax.scatter(proj_poles[n][0],
+                             proj_poles[n][1], edgecolors=clr_map, s=marker_size)
+            else:
+                cax = ax.scatter(proj_poles[n][0],
+                                proj_poles[n][1], cmap=cm.hsv, s=marker_size)
+            
+            if proj_poles_theory is not None:
+                cax = ax.scatter(proj_poles_theory[n][0],
+                            proj_poles_theory[n][1], cmap=cm.hsv, s=20)
+            
             ax.set_rmax(1)
             ax.set_xticklabels(
                 [axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
             ax.set_yticklabels([])
-            ax.set_title("{" + poles_lbl[n] + "}", va='bottom')
+            ax.set_title("{" + poles_lbl[n] + "}", loc='left')
             if not grid:
                 ax.yaxis.grid(False)
                 ax.xaxis.grid(False)

@@ -332,7 +332,7 @@ def plane_normal(hkl_plane, latt_vecs=None, latt_sys=None, latt_params=None,
     hkl_plane : list or ndarray 
         The Miller indices of a crystallographic plane.
     latt_vecs : ndarray of shape (3, 3), optional
-        Row vectors representing the lattive unit cell in a Cartesian reference frame.
+        Row vectors representing the lattice unit cell in a Cartesian reference frame.
         See Notes.
     latt_sys : string, optional
         Lattice system is one of cubic, hexagonal, rhombohedral, tetragonal,

@@ -4,6 +4,7 @@ from crystex import coordgeometry
 from crystex import rotations
 from crystex import lattice
 from crystex import symmetry
+from crystex import numutils
 
 def equal_area_proj(xyz):
     """
@@ -34,7 +35,6 @@ def equal_area_proj(xyz):
     # return spc[1],2*np.sin(spc[2]/2)/np.sqrt(2)
 
     xyz = xyz / np.linalg.norm(xyz, axis=0)
-
     ρ, θ, φ = coordgeometry.cart2spherical(xyz)  # radius, azimuthal, polar
 
     # Rotate poles in South hemisphere to North
@@ -43,9 +43,11 @@ def equal_area_proj(xyz):
             φ[i] = np.abs(φ[i] - np.pi)
             θ[i] = θ[i] + np.pi
 
-    np.putmask(θ, θ >= np.pi, θ - 2 * np.pi)  # wrap angles in (-π, π)
+    np.putmask(θ, (θ-np.pi) >= -1e-5, θ - 2 * np.pi)  # wrap angles in (-π, π)
     R = 2 * np.sin(φ / 2) / np.sqrt(2)
 
+    # if np.isclose((R - 1), 0.0) and (θ - 0.0) < -1e-8:
+    #     θ *= -1
     return θ, R
 
 
@@ -79,7 +81,7 @@ def stereographic_proj(xyz):
     return θ, R
 
 
-def project_crystal_poles(poles, rot_mat=None, eulers=None, proj_type=None, 
+def project_crystal_poles(poles,  eulers=None,rot_mat=None, proj_type=None, 
                             lattice_sys=None, latt_params=None,
                             pole_type=None, degrees=False, align='cz', crys=None,
                             axes='xyz', ret_poles=False,
@@ -131,7 +133,7 @@ def project_crystal_poles(poles, rot_mat=None, eulers=None, proj_type=None,
         A rotation axis and angle in degrees defined by the user. 
         Example: [[0,1,0], 90]
     apply_sym : bool
-        Apply symmetry (optional). Only works for hcp at the moment.
+        Apply symmetry (optional). Works for cubic, hexagonal and monoclinic only.
 
     Returns
     -------
@@ -182,15 +184,24 @@ def project_crystal_poles(poles, rot_mat=None, eulers=None, proj_type=None,
                          ' and `rot_mat`. Specify either `crys`=\'single\' or '
                          '`crys`=\'poly\' and `rot_mat`'.format(crys, rot_mat))
     
+    sym_ops = [np.eye(3)]
+    
+
     # Apply symmetry 
     if apply_sym:
         if lattice_sys=='hexagonal':
             sym_ops = symmetry.SYM_OPS['6/mmm'] # 12 symmetry operators
-            rot_mat_sym = []
-            for sym in sym_ops:
-                rot_mat_sym.append(sym @ rot_mat)
-            rot_mat = np.reshape(np.array(rot_mat_sym), (len(sym_ops)*rot_mat.shape[0], 3, 3))
-
+        elif lattice_sys=='monoclinic':
+            sym_ops = symmetry.SYM_OPS['2/m'] # 2 symmetry operators
+        elif lattice_sys=='cubic':
+            sym_ops = symmetry.SYM_OPS[lattice_sys]
+        elif lattice_sys=='tetragonal':
+            sym_ops = symmetry.SYM_OPS[lattice_sys]
+        elif lattice_sys=='triclinic':
+            sym_ops = symmetry.SYM_OPS[lattice_sys]
+        else:
+            raise ValueError('Symmetry operators only implemented for cubic, tetragonal, hexagonal and monoclinic crystals')
+        
     # Check valid entry for projection type
     proj_opt = {'stereographic': stereographic_proj,
                 'equal_area': equal_area_proj}
@@ -209,7 +220,6 @@ def project_crystal_poles(poles, rot_mat=None, eulers=None, proj_type=None,
                              axes, all_axes))
     else:
         R_ax = rotations.rotate_axes(axes)
-
     # Find user defined rotation matrix
     if user_rot:
         R_usr = rotations.ax_ang2rot_mat(
@@ -222,65 +232,110 @@ def project_crystal_poles(poles, rot_mat=None, eulers=None, proj_type=None,
                        'α': latt_params[3],
                        'β': latt_params[4],
                        'γ': latt_params[5]}
-        M = lattice.crystal2ortho(lattice_sys, **params_dict, normed=True,
+        M = lattice.crystal2ortho(**params_dict, normed=True,
                                   degrees=degrees, align=align)
     else:
         M = lattice.crystal2ortho(lattice_sys, normed=True,
                                   degrees=degrees, align=align)
 
     cell_e = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]]).T
-
+    print('M = ', M)
     # Crystal vectors in orthonormal basis as column vectors
     cell_ortho = np.dot(M.T, cell_e)
 
     pole_types = ['direction', 'plane-normal']
     proj_poles = []
-
+    all_ppp = []
     if pole_type not in pole_types:
         raise ValueError('"{}" is not a valid `pole_type` option. '
                          '`pole_type` must be one of: {}.'.format(
                              pole_type, pole_types))
-
+    
     elif pole_type == 'plane-normal':
         # Convert Miller-Bravais to Miller indices
         if lattice_sys == 'hexagonal' and poles.shape[0] == 4:
             poles = lattice.miller_brav2miller(poles, idx_type='plane')
 
-        # Reciprocal lattice vectors in orthonormal basis
+         # Reciprocal lattice vectors in orthonormal basis
         cell_rec = lattice.reciprocal_lattice_vecs(cell_ortho)
-        M_rec = cell_rec        # Column vectors of reciprocal a,b,c
-        # Reciprocal lattice vectors for poles (column vectors)
-        g_poles = np.dot(cell_rec, poles)
         
+        # Reciprocal lattice vectors for poles (column vectors)
+        g_poles_sym = []
+        for p in poles.T:
+            g_poles = np.dot(cell_rec, p)
+            g_poles_sym.append((sym_ops @ g_poles).T)
+
         if crys == 'poly':
-            for g_i in range(g_poles.shape[1]):
-                pp = np.dot(rot_mat, g_poles[:, g_i]).T
-                ppp = np.dot(np.squeeze(R_ax, axis=0), pp)
+            for g_i in range(len(g_poles_sym)):
+                pp = (rot_mat @ g_poles_sym[g_i]).T
+                ppp = np.squeeze(R_ax, axis=0) @ pp
                 if user_rot:
-                    ppp = np.dot(np.squeeze(R_usr, axis=0), ppp)
-                proj_poles.append(project(ppp))
+                    ppp = np.squeeze(R_usr, axis=0) @ ppp
+                proj_p = []
+                for ps in range(ppp.shape[0]):
+                    proj_p.append(project(ppp[ps]))
+                proj_poles.append(np.concatenate(proj_p, axis=1))
+                all_ppp.append(ppp)
+                
         else:
-            proj_poles.append(project(g_poles))
+            for g_i in range(len(g_poles_sym)):
+                proj_poles.append(project(g_poles_sym[g_i]))
+        # g_poles = np.dot(cell_rec, poles)
+        # if crys == 'poly':
+        #     for g_i in range(g_poles.shape[1]):
+        #         pp = np.dot(rot_mat, g_poles[:, g_i]).T
+        #         print(pp.shape)
+        #         ppp = np.dot(np.squeeze(R_ax, axis=0), pp)
+        #         if user_rot:
+        #             ppp = np.dot(np.squeeze(R_usr, axis=0), ppp)
+        #         proj_poles.append(project(ppp))
+        # else:
+        #     proj_poles.append(project(g_poles))
 
     elif pole_type == 'direction':
+        # rot_mat_sym = []
+        # for sym in sym_ops:
+        #     rot_mat_sym.append(sym @ rot_mat)
+        # rot_mat = np.reshape(np.array(rot_mat_sym), (len(sym_ops)*rot_mat.shape[0], 3, 3))
         # Convert Miller-Bravais to Miller indices
         if lattice_sys == 'hexagonal' and poles.shape[0] == 4:
             poles = lattice.miller_brav2miller(poles, idx_type='direction')
-
-        d_poles = np.dot(M.T, poles)
-
+        
+        d_poles_sym = []
+        for p in poles.T:
+            poles_sym = np.dot(sym_ops, p).T
+            d_poles_sym.append(np.dot(M.T, poles_sym))
+        
+        # print('d_poles_sym: ', d_poles_sym, '\n\n')    
+        # for p in poles.T:
+        #     poles_sym = np.dot(sym_ops, p).T
+        # d_poles = np.dot(M.T, poles)
+        # print(rot_mat)
         if crys == 'poly':
-            for d_i in range(d_poles.shape[1]):
-                pp = np.dot(rot_mat, d_poles[:, d_i]).T
-                ppp = np.dot(np.squeeze(R_ax, axis=0), pp)
+            
+            for d_i in range(len(d_poles_sym)):
+                pp = (rot_mat @ d_poles_sym[d_i]).T
+                ppp = np.squeeze(R_ax, axis=0) @ pp
                 if user_rot:
-                    ppp = np.dot(np.squeeze(R_usr, axis=0), ppp)
-                proj_poles.append(project(ppp))
+                    ppp = np.squeeze(R_usr, axis=0) @ ppp
+                proj_p = []
+                for ps in range(ppp.shape[0]):
+                    proj_p.append(project(ppp[ps]))
+                proj_poles.append(np.concatenate(proj_p, axis=1))
+                all_ppp.append(ppp)
+            # for d_i in range(d_poles.shape[1]):
+            #     pp = np.dot(rot_mat, d_poles[:, d_i]).T
+            #     ppp = np.dot(np.squeeze(R_ax, axis=0), pp)
+            #     if user_rot:
+            #         ppp = np.dot(np.squeeze(R_usr, axis=0), ppp)
+            #     proj_poles.append(project(ppp))
         else:
             proj_poles.append(project(d_poles))
 
+    # if np.isclose(proj_poles[2][1],0.2, rtol=2e-03):
+
     if ret_poles:
-        return proj_poles, ppp
+        return proj_poles, all_ppp
     else:
         return proj_poles
 

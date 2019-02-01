@@ -46,8 +46,7 @@ def fibre_misorientation(fibre, euler_data, lattice_system, latt_params,
                                                      proj_type='equal_area', lattice_sys=lattice_system,
                                                      latt_params=latt_params, pole_type='plane-normal',
                                                      degrees=True, axes=axes, ret_poles=True,
-                                                     user_rot=user_rot)[1]
-
+                                                     user_rot=user_rot)[1][0]
     sp_3dpoles = coordgeometry.cart2spherical(cart_3dpoles)
 
     # Calculate fibre misorientation angle [0°, 90°]
