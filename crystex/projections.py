@@ -36,7 +36,7 @@ def equal_area_proj(xyz):
 
     xyz = xyz / np.linalg.norm(xyz, axis=0)
     ρ, θ, φ = coordgeometry.cart2spherical(xyz)  # radius, azimuthal, polar
-
+    # print('ρ, θ, φ: ', ρ, θ, φ)
     # Rotate poles in South hemisphere to North
     for i, phi in enumerate(φ):
         if φ[i] > np.pi / 2:
@@ -68,7 +68,7 @@ def stereographic_proj(xyz):
     xyz = xyz / np.linalg.norm(xyz, axis=0)
 
     ρ, θ, φ = coordgeometry.cart2spherical(xyz)  # radius, azimuthal, polar
-
+    # print('ρ, θ, φ: ', ρ, θ, φ)
     # Rotate poles in South hemisphere to North
     for i, phi in enumerate(φ):
         if φ[i] > np.pi / 2:
@@ -81,11 +81,11 @@ def stereographic_proj(xyz):
     return θ, R
 
 
-def project_crystal_poles(poles,  eulers=None,rot_mat=None, proj_type=None, 
+def project_crystal_poles(poles,  eulers=None, rot_mat=None, proj_type=None, 
                             lattice_sys=None, latt_params=None,
                             pole_type=None, degrees=False, align='cz', crys=None,
                             axes='xyz', ret_poles=False,
-                            user_rot=None, apply_sym=False):
+                            user_rot=None, apply_sym=False, ret_sym_sep=False):
     """
     Project a set of crystal poles specified using Miller(-Bravais) indices.
 
@@ -186,11 +186,12 @@ def project_crystal_poles(poles,  eulers=None,rot_mat=None, proj_type=None,
     
     sym_ops = [np.eye(3)]
     
-
     # Apply symmetry 
     if apply_sym:
         if lattice_sys=='hexagonal':
             sym_ops = symmetry.SYM_OPS['6/mmm'] # 12 symmetry operators
+            # vals_true = np.array([False,False,False,True,True,True,True,True,True,False,False,False,])
+            # sym_ops = np.array(sym_ops)[vals_true]
         elif lattice_sys=='monoclinic':
             sym_ops = symmetry.SYM_OPS['2/m'] # 2 symmetry operators
         elif lattice_sys=='cubic':
@@ -201,7 +202,7 @@ def project_crystal_poles(poles,  eulers=None,rot_mat=None, proj_type=None,
             sym_ops = symmetry.SYM_OPS[lattice_sys]
         else:
             raise ValueError('Symmetry operators only implemented for cubic, tetragonal, hexagonal and monoclinic crystals')
-        
+    # print('len(sym_ops)', len(sym_ops))
     # Check valid entry for projection type
     proj_opt = {'stereographic': stereographic_proj,
                 'equal_area': equal_area_proj}
@@ -232,16 +233,17 @@ def project_crystal_poles(poles,  eulers=None,rot_mat=None, proj_type=None,
                        'α': latt_params[3],
                        'β': latt_params[4],
                        'γ': latt_params[5]}
-        M = lattice.crystal2ortho(**params_dict, normed=True,
+        M = lattice.crystal2ortho(**params_dict, normed=False,
                                   degrees=degrees, align=align)
     else:
         M = lattice.crystal2ortho(lattice_sys, normed=True,
                                   degrees=degrees, align=align)
 
-    cell_e = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]]).T
-    print('M = ', M)
+    cell_e = np.eye(3)
+    
     # Crystal vectors in orthonormal basis as column vectors
     cell_ortho = np.dot(M.T, cell_e)
+    # print('cell_ortho: ', cell_ortho)
 
     pole_types = ['direction', 'plane-normal']
     proj_poles = []
@@ -264,17 +266,23 @@ def project_crystal_poles(poles,  eulers=None,rot_mat=None, proj_type=None,
         for p in poles.T:
             g_poles = np.dot(cell_rec, p)
             g_poles_sym.append((sym_ops @ g_poles).T)
-
+            # print('p: ', p)
+            # print('g_poles shape: ', g_poles.shape)
+            # print('symm gpoles: ', (sym_ops @ g_poles).T)
         if crys == 'poly':
             for g_i in range(len(g_poles_sym)):
                 pp = (rot_mat @ g_poles_sym[g_i]).T
+                # print('g_i: ', g_i)
                 ppp = np.squeeze(R_ax, axis=0) @ pp
                 if user_rot:
                     ppp = np.squeeze(R_usr, axis=0) @ ppp
                 proj_p = []
                 for ps in range(ppp.shape[0]):
                     proj_p.append(project(ppp[ps]))
-                proj_poles.append(np.concatenate(proj_p, axis=1))
+                if ret_sym_sep:
+                    proj_poles.append(proj_p)
+                else:
+                    proj_poles.append(np.concatenate(proj_p, axis=1))
                 all_ppp.append(ppp)
                 
         else:
