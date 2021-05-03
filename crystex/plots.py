@@ -18,7 +18,8 @@ from crystex import numutils
 
 def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
                   grid=False, clrs=None, contour=False, bins=50, title=None,
-                  marker_size=0.005, clr_map=None, proj_poles_theory=None):
+                  marker_size=0.005, clr_map=None, proj_poles_theory=None,
+                  axes_lbl=True, pole_lbl=None, cols_th=None):
     """
     Return a figure object for a pole figure. For a single crystal, plots a single 
     pole figure for all `poles`. For a poly crystal, plots n pole figures, one 
@@ -114,6 +115,7 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
         width_ratios = np.append([1] * n_figs, 0.1)
         # get poles labels
         poles_lbl = []
+
         for i in range(n_figs):
             poles_lbl.append(''.join([str(x) for x in poles[:, i]]))
 
@@ -167,17 +169,27 @@ def plot_pole_fig(proj_poles, poles, crys=None,  lattice_sys=None, axes='xyz',
                              proj_poles[n][1], edgecolors=clr_map, s=marker_size)
             else:
                 cax = ax.scatter(proj_poles[n][0],
-                                proj_poles[n][1], cmap=cm.hsv, s=marker_size)
+                                proj_poles[n][1], s=marker_size)
             
-            if proj_poles_theory is not None:
+            if proj_poles_theory is not None and cols_th is not None:
+                for i in range(12):
+                    # print(2*i)
+                    cax = ax.scatter(proj_poles_theory[n][0][2*i:2*(i+1)],
+                                proj_poles_theory[n][1][2*i:2*(i+1)], s=10, c=cols_th[i])
+            elif proj_poles_theory is not None: 
                 cax = ax.scatter(proj_poles_theory[n][0],
-                            proj_poles_theory[n][1], cmap=cm.hsv, s=20)
+                            proj_poles_theory[n][1], s=20)
             
             ax.set_rmax(1)
-            ax.set_xticklabels(
-                [axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
             ax.set_yticklabels([])
-            ax.set_title("{" + poles_lbl[n] + "}", loc='left')
+            if axes_lbl:
+                ax.set_xticklabels(
+                    [axes[0].upper(), '', axes[1].upper(), '', '', '', '', ''])
+                ax.set_title("{" + poles_lbl[n] + "}", loc='left')
+            else:
+                ax.set_xticklabels(['', '', '', '', '', '', '', ''])
+                ax.set_title(pole_lbl[n], fontsize=12)
+            
             if not grid:
                 ax.yaxis.grid(False)
                 ax.xaxis.grid(False)
