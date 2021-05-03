@@ -380,18 +380,19 @@ def plane_normal(hkl_plane, latt_vecs=None, latt_sys=None, latt_params=None,
                        'α': latt_params[3],
                        'β': latt_params[4],
                        'γ': latt_params[5]}
-        M = crystal2ortho(latt_sys, **params_dict, normed=True,
+        M = crystal2ortho(latt_sys, **params_dict, normed=False,
                           degrees=degrees, align=align)
     else:
-        M = crystal2ortho(latt_sys, normed=True,
+        M = crystal2ortho(latt_sys, normed=False,
                           degrees=degrees, align=align)
-
+    # print('M: ', M)
     cell_ortho = np.dot(M.T, np.eye(3))
     cell_rec = reciprocal_lattice_vecs(cell_ortho)
+    # print('cell_rec: ', cell_rec)
     hkl_norm = np.dot(cell_rec, hkl_plane)
     if normed:
         hkl_norm = hkl_norm / np.linalg.norm(hkl_norm, axis=0)
-
+    # print('hkl_norm: ', hkl_norm)
     return hkl_norm
 
 
@@ -437,12 +438,11 @@ def plane_from_normal(hkl_norm, latt_sys=None, latt_params=None, degrees=False, 
                        'α': latt_params[3],
                        'β': latt_params[4],
                        'γ': latt_params[5]}
-        M = crystal2ortho(latt_sys, **params_dict, normed=True,
+        M = crystal2ortho(latt_sys, **params_dict, normed=False,
                           degrees=degrees, align=align)
     else:
-        M = crystal2ortho(latt_sys, normed=True,
+        M = crystal2ortho(latt_sys, normed=False,
                           degrees=degrees, align=align)
-
     cell_ortho = np.dot(M.T, np.eye(3))
     cell_rec = reciprocal_lattice_vecs(cell_ortho)
     hkl_plane = np.dot(np.linalg.inv(cell_rec), hkl_norm)
@@ -450,7 +450,7 @@ def plane_from_normal(hkl_norm, latt_sys=None, latt_params=None, degrees=False, 
     return hkl_plane
 
 
-def cart2miller(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
+def cart2miller(vec, lat, lat_params, tol, vec_type, max_mill=20, degrees_in=False,
                 degrees_out=False):
 
     all_mill, all_ang = cart2miller_all(
@@ -490,7 +490,10 @@ def cart2miller_all(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
     vec : ndarray of shape (3, 1) 
         Cartesian vector whose direction in Miller indices is to be found.
     lat : ndarray of shape (3, 3)
-        Column vectors representing the lattice unit cell 
+        Column vectors representing the lattice unit cell
+    lat_params : list of lenght 6
+        Lattice parameters. The fist three represent the magnitude of each of 
+        the lattice vectors.
     tol : float
         Snapping angular tolerance in degrees.
     vec_type : str ("direction" | "plane-normal")
@@ -499,8 +502,7 @@ def cart2miller_all(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
     max_mill: int, optional
         Maximum Miller index. By default, set to 20.
     degrees_in : bool, optional
-        If True, the angular tolerance will be interpreted as degrees,
-        otherwise radians. False by default.
+        If True, the angular tolerance and the angular lattice parameters will be interpreted as degrees, otherwise radians. False by default.
     degrees_out : bool, optional
         If True, the angular differences will be returned in degrees, otherwise
         in radians. False by default.
@@ -512,6 +514,8 @@ def cart2miller_all(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
         indices within the specified tolerance. The second array is the
         corresponding angular difference between a given found Miller vector
         and the specified vector. Both arrays are sorted by smallest angle.
+    NEW:
+     - Added lattice parameters as input.
 
     """
 
@@ -531,26 +535,33 @@ def cart2miller_all(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
     tol_dist = 2 * np.sin(tol / 2)
 
     vec_unit = vec / np.linalg.norm(vec, axis=0)
+    print(vec_unit)
 
     # Transform vector to a lattice basis and check if in search space.
     # Search space is the lattice half-space with positive a-component.
     vec_lat = np.dot(np.linalg.inv(lat), vec_unit)
     flip_vec_to_half_space(vec_lat)
     vec_unit = np.dot(lat, vec_lat)
+    print(vec_unit)
 
     trials_lat = coordgeometry.find_non_parallel_int_vecs(
         max_mill, tile=True).T
-
+    print('trials_lat: ', trials_lat[:,2])
+    
     if vec_type == 'direction':
         trials_cart = lat @ trials_lat
         trials_cart_unit = trials_cart / np.linalg.norm(trials_cart, axis=0)
 
     elif vec_type == 'plane-normal':
         trials_cart_unit = plane_normal(
-            trials_lat, latt_vecs=lat, normed=True)
-
+            trials_lat, latt_vecs=lat.T, normed=True)
+        
+        # lattice.plane_normal(np.array([[0,0,1]]).T, M_mon, 'monoclinic', latt_params_mzro2, degrees=True)
+        
+        print('trials_cart_unit: \n', trials_cart_unit)
     diff = trials_cart_unit - vec_unit
     diff_mag = np.linalg.norm(diff, axis=0)
+    print('diff: ', diff)
 
     # Get indices of trial lattice vectors which are within tolerance
     good_diff_idx = np.where(diff_mag < tol_dist)[0]
@@ -573,3 +584,8 @@ def cart2miller_all(vec, lat, tol, vec_type, max_mill=20, degrees_in=False,
     good_angs_srt = good_angs[srt_idx]
 
     return (good_mill_srt, good_angs_srt)
+
+
+
+
+    
