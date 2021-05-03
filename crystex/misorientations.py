@@ -40,13 +40,17 @@ def fibre_misorientation(fibre, euler_data, lattice_system, latt_params,
         Misorientation angles away from the given fibre in radians.
     weights : ndarray
         Weights for each misorientation angle calculated as 1 / sin(mis_ang).
+
+    TODO:
+    - Find why dimensions of cart_3dpoles have changed to (1, N, 3) instead of (N, 3)
     """
 
-    cart_3dpoles = projections.project_crystal_poles(fibre, crys='poly', eulers=euler_data,
-                                                     proj_type='equal_area', lattice_sys=lattice_system,
-                                                     latt_params=latt_params, pole_type='plane-normal',
-                                                     degrees=True, axes=axes, ret_poles=True,
-                                                     user_rot=user_rot)[1][0]
+    cart_3dpoles = projections.project_crystal_poles(
+        fibre, crys='poly', eulers=euler_data, proj_type='equal_area', lattice_sys=lattice_system,latt_params=latt_params, pole_type='plane-normal', degrees=True, axes=axes, ret_poles=True, user_rot=user_rot
+    )[1][0]
+
+    # Dimensions of cart_3dpoles are (1, N, 3)
+    cart_3dpoles = cart_3dpoles.squeeze()
     sp_3dpoles = coordgeometry.cart2spherical(cart_3dpoles)
 
     # Calculate fibre misorientation angle [0°, 90°]
